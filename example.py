@@ -1,6 +1,6 @@
 import time
-from env.xarm_env import XArmEnv
-from env.xarm_config import XArmConfig
+from robot_env.xarm_env import XArmEnv
+from robot_env.xarm_config import XArmConfig
 from controller.spacemouse_config import SpaceMouseConfig
 from controller.spacemouse_controller import SpaceMouse
 
@@ -12,6 +12,8 @@ spacemouse = SpaceMouse(spacemouse_cfg)
 
 control_loop_rate = xarm_cfg.control_loop_rate
 control_loop_period = 1.0 / control_loop_rate
+
+xarm_env._arm_reset()
 
 try:
     while True:
@@ -28,8 +30,7 @@ try:
         time.sleep(sleep_time)
 except KeyboardInterrupt:
     print("Teleop manually shut down!")
+    xarm_env._arm_reset()
 except Exception as e:
     print(f"An error occurred: {e}")
-
-
-
+    xarm_env._arm_reset()

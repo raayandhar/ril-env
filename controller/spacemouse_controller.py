@@ -31,7 +31,7 @@ class SpaceMouse:
 
         self._display_controls()
 
-        self.single_click_and_hold = False
+        self.grasp = 0.0 
 
         self._control = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         self._reset_state = 0
@@ -55,7 +55,7 @@ class SpaceMouse:
         print("")
         print_command("Control", "Command")
         print_command("Right button", "reset simulation")
-        print_command("Left button (hold)", "close gripper")
+        print_command("Left button", "toggle gripper open/close")
         print_command("Move mouse laterally", "move arm horizontally in x-y plane")
         print_command("Move mouse vertically", "move arm vertically")
         print_command("Twist mouse about an axis", "rotate arm about a corresponding axis")
@@ -68,7 +68,7 @@ class SpaceMouse:
         self.x, self.y, self.z = 0, 0, 0
         self.roll, self.pitch, self.yaw = 0, 0, 0
         self._control = np.zeros(6)
-        self.single_click_and_hold = False
+        self.grasp = 0.0
 
     def start_control(self):
         self._reset_internal_state()
@@ -78,6 +78,7 @@ class SpaceMouse:
     def get_controller_state(self):
         with self.lock:
             control = self.control.copy()
+            grasp = self.grasp
 
         # Increased scaling factors
         dpos = control[:3] * 0.05 * self.pos_sensitivity
@@ -93,13 +94,11 @@ class SpaceMouse:
             dpos=dpos,
             rotation=self.rotation,
             raw_drotation=np.array([roll, pitch, yaw]),
-            grasp=self.control_gripper,
+            grasp=grasp,
             reset=self._reset_state,
         )
 
     def run(self):
-        t_last_click = -1
-
         while True:
             d = self.device.read(13)
             if d is not None and self._enabled:
@@ -134,7 +133,7 @@ class SpaceMouse:
                         self.x = convert(d[3], d[4])
                         self.z = convert(d[5], d[6]) * -1.0
 
-                        self.roll = convert(d[7], d[8]) 
+                        self.roll = convert(d[7], d[8])
                         self.pitch = convert(d[9], d[10])
                         self.yaw = convert(d[11], d[12])
 
@@ -152,12 +151,15 @@ class SpaceMouse:
 
                 if d[0] == 3:
                     if d[1] == 1:
-                        self.single_click_and_hold = True
-
-                    if d[1] == 0:
-                        self.single_click_and_hold = False
-
-                    if d[1] == 2:
+                        with self.lock:
+                            if self.grasp == 0.0:
+                                self.grasp = 1.0
+                            else:
+                                self.grasp = 0.0
+                        if self.verbose:
+                            state = "closed" if self.grasp == 1.0 else "opened"
+                            print(f"Gripper toggled to: {state}")
+                    elif d[1] == 2:
                         self._reset_state = 1
                         self._enabled = False
                         self._reset_internal_state()
@@ -168,7 +170,7 @@ class SpaceMouse:
 
     @property
     def control_gripper(self):
-        if self.single_click_and_hold:
-            return 1.0
-        return 0
-
+        if self.grasp == 1.0:
+            return 'close'
+        else:
+            return 'open'
