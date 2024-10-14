@@ -1,4 +1,5 @@
 import numpy as np
+import json
 import time
 import sys
 import os
@@ -32,23 +33,67 @@ class XArmEnv:
 
         self.verbose = self.config.verbose
 
+        # temp testing for recording
+        self.recording = []
+        self.is_recording = False
+        self.is_replaying = False
+        self.replay_index = 0
+
+    def start_recording(self):
+        self.recording = []
+        self.is_recording = True
+        print("Recording started.")
+
+    def stop_recording(self):
+        self.is_recording = False
+        print("Recording stopped.")
+
+    def save_recording(self, filename):
+        with open(filename, 'w') as f:
+            json.dump(self.recording, f)
+        print(f"Recording saved to {filename}.")
+
+    def load_recording(self, filename):
+        with open(filename, 'r') as f:
+            self.recording = json.load(f)
+        print(f"Recording loaded from {filename}.")
+
+    def start_replay(self):
+        if not self.recording:
+            print("No recording loaded.")
+            return
+        self.is_replaying = True
+        self.replay_index = 0
+        print("Replay started.")
+
     def step(self, dpos, drot, grasp):
         if not self.init:
             print("Error: Arm not initialized.")
             return
 
-        arm = self.arm
-        current_position = self.current_position
-        current_orientation = self.current_orientation
+        if self.is_replaying:
+            if self.replay_index < len(self.recording):
+                action = self.recording[self.replay_index]
+                dpos = np.array(action['dpos'])
+                drot = np.array(action['drot'])
+                grasp = action['grasp']
+                self.replay_index += 1
+                time.sleep(0.005)
+                # time.sleep(0.1)
+            else:
+                self.is_replaying = False
+                print("Replay finished.")
+                return
 
-        current_position += dpos
-        current_orientation += drot
+        arm = self.arm
+        self.current_position += dpos
+        self.current_orientation += drot
 
         if self.verbose:
-            print(f"Current position: {current_position} \n")
-            print(f"Current orientation: {current_orientation} \n")
+            print(f"Current position: {self.current_position} \n")
+            print(f"Current orientation: {self.current_orientation} \n")
 
-        ret = arm.set_servo_cartesian(np.concatenate((current_position, current_orientation)), is_radian=False)
+        ret = arm.set_servo_cartesian(np.concatenate((self.current_position, self.current_orientation)), is_radian=False)
 
         if ret != 0:
             print(f"Error in set_servo_cartesian: {ret}")
@@ -63,6 +108,13 @@ class XArmEnv:
                 if ret != 0:
                     print(f"Error in set_gripper_position (open): {ret}")
             self.previous_grasp = grasp
+
+        if self.is_recording:
+            self.recording.append({
+                'dpos': dpos.tolist(),
+                'drot': drot.tolist(),
+                'grasp': grasp
+            })
 
     def _arm_init(self):
         ip = self.config.ip
