@@ -4,17 +4,16 @@ import time
 import sys
 import os
 
-from configparser import ConfigParser
 # TODO: issue with relative import
+from xarm.wrapper import XArmAPI
 from .xarm_config import XArmConfig
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '../../..'))
+sys.path.append(os.path.join(os.path.dirname(__file__), "../../.."))
 
-from xarm.wrapper import XArmAPI
 
 class XArmEnv:
     def __init__(self, xarm_config: XArmConfig):
-        self.config  = xarm_config
+        self.config = xarm_config
 
         self.init = False
         self.gripper_speed = self.config.gripper_speed
@@ -22,7 +21,7 @@ class XArmEnv:
         if not self.init:
             print("Failed to initialize the arm.")
             sys.exit(1)
-        _, initial_pose  = self.arm.get_position(is_radian=False)
+        _, initial_pose = self.arm.get_position(is_radian=False)
         self.home_pos = self.config.home_pos
         self.home_speed = self.config.home_speed
         self.current_position = np.array(initial_pose[:3])
@@ -39,6 +38,8 @@ class XArmEnv:
         self.is_replaying = False
         self.replay_index = 0
 
+    # split recording off from this XArmEnv
+    # encapsulate the logic for step so it doesn't need to pass in dpos, drot
     def start_recording(self):
         self.recording = []
         self.is_recording = True
@@ -49,12 +50,12 @@ class XArmEnv:
         print("Recording stopped.")
 
     def save_recording(self, filename):
-        with open(filename, 'w') as f:
+        with open(filename, "w") as f:
             json.dump(self.recording, f)
         print(f"Recording saved to {filename}.")
 
     def load_recording(self, filename):
-        with open(filename, 'r') as f:
+        with open(filename, "r") as f:
             self.recording = json.load(f)
         print(f"Recording loaded from {filename}.")
 
@@ -74,9 +75,9 @@ class XArmEnv:
         if self.is_replaying:
             if self.replay_index < len(self.recording):
                 action = self.recording[self.replay_index]
-                dpos = np.array(action['dpos'])
-                drot = np.array(action['drot'])
-                grasp = action['grasp']
+                dpos = np.array(action["dpos"])
+                drot = np.array(action["drot"])
+                grasp = action["grasp"]
                 self.replay_index += 1
                 time.sleep(0.005)
                 # time.sleep(0.1)
@@ -93,7 +94,10 @@ class XArmEnv:
             print(f"Current position: {self.current_position} \n")
             print(f"Current orientation: {self.current_orientation} \n")
 
-        ret = arm.set_servo_cartesian(np.concatenate((self.current_position, self.current_orientation)), is_radian=False)
+        ret = arm.set_servo_cartesian(
+            np.concatenate((self.current_position, self.current_orientation)),
+            is_radian=False,
+        )
 
         if ret != 0:
             print(f"Error in set_servo_cartesian: {ret}")
@@ -110,11 +114,9 @@ class XArmEnv:
             self.previous_grasp = grasp
 
         if self.is_recording:
-            self.recording.append({
-                'dpos': dpos.tolist(),
-                'drot': drot.tolist(),
-                'grasp': grasp
-            })
+            self.recording.append(
+                {"dpos": dpos.tolist(), "drot": drot.tolist(), "grasp": grasp}
+            )
 
     def _arm_init(self):
         ip = self.config.ip
@@ -177,7 +179,9 @@ class XArmEnv:
 
     def _arm_reset(self):
         if not self.init:
-            print("Error initializing arm or arm was never initialized. Are you sure you're using this method correctly?")
+            print(
+                "Error initializing arm or arm was never initialized. Are you sure you're using this method correctly?"
+            )
             return
         arm = self.arm
         arm.set_mode(0)

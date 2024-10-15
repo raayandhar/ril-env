@@ -1,8 +1,6 @@
 import time
-from robot_env.xarm_env import XArmEnv
-from robot_env.xarm_config import XArmConfig
-from controller.spacemouse_config import SpaceMouseConfig
-from controller.spacemouse_controller import SpaceMouse
+from ril_env.xarm_env import XArmEnv, XArmConfig
+from ril_env.controller import SpaceMouse, SpaceMouseConfig
 
 spacemouse_cfg = SpaceMouseConfig()
 xarm_cfg = XArmConfig()
@@ -20,9 +18,9 @@ try:
         loop_start_time = time.time()
 
         controller_state = spacemouse.get_controller_state()
-        dpos = controller_state['dpos'] * xarm_cfg.position_gain
-        drot = controller_state['raw_drotation'] * xarm_cfg.orientation_gain
-        grasp = controller_state['grasp']
+        dpos = controller_state["dpos"] * xarm_cfg.position_gain
+        drot = controller_state["raw_drotation"] * xarm_cfg.orientation_gain
+        grasp = controller_state["grasp"]
 
         xarm_env.step(dpos, drot, grasp)
         elapsed_time = time.time() - loop_start_time
