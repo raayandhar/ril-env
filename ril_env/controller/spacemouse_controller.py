@@ -1,15 +1,9 @@
 import hid
 import threading
-import time
 import numpy as np
-import sys
-import math
-import os
-from collections import namedtuple
-from .utils import scale_to_control, to_int16, convert, rotation_matrix
+from .utils import convert, rotation_matrix
 from .spacemouse_config import SpaceMouseConfig
 
-from xarm.wrapper import XArmAPI
 
 class SpaceMouse:
     def __init__(self, config: SpaceMouseConfig):
@@ -31,13 +25,11 @@ class SpaceMouse:
 
         self._display_controls()
 
-        self.grasp = 0.0 
+        self.grasp = 0.0
 
         self._control = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         self._reset_state = 0
-        self.rotation = np.array([[-1.0, 0.0, 0.0],
-                                  [0.0, 1.0, 0.0],
-                                  [0.0, 0.0, -1.0]])
+        self.rotation = np.array([[-1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, -1.0]])
         self._enabled = True
 
         self.lock = threading.Lock()  # Thread safety is important!
@@ -58,13 +50,13 @@ class SpaceMouse:
         print_command("Left button", "toggle gripper open/close")
         print_command("Move mouse laterally", "move arm horizontally in x-y plane")
         print_command("Move mouse vertically", "move arm vertically")
-        print_command("Twist mouse about an axis", "rotate arm about a corresponding axis")
+        print_command(
+            "Twist mouse about an axis", "rotate arm about a corresponding axis"
+        )
         print("")
 
     def _reset_internal_state(self):
-        self.rotation = np.array([[-1.0, 0.0, 0.0],
-                                  [0.0, 1.0, 0.0],
-                                  [0.0, 0.0, -1.0]])
+        self.rotation = np.array([[-1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, -1.0]])
         self.x, self.y, self.z = 0, 0, 0
         self.roll, self.pitch, self.yaw = 0, 0, 0
         self._control = np.zeros(6)
@@ -171,6 +163,6 @@ class SpaceMouse:
     @property
     def control_gripper(self):
         if self.grasp == 1.0:
-            return 'close'
+            return "close"
         else:
-            return 'open'
+            return "open"
