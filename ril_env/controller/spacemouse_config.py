@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+
 @dataclass
 class SpaceMouseConfig:
     """
@@ -11,9 +12,9 @@ class SpaceMouseConfig:
     :config_param rot_sensitivity: rotation sensitivity (do not change!)
     :config_param verbose: adds helpful debugging print statements
     """
+
     pos_sensitivity: float = 1.0
     rot_sensitivity: float = 1.0
     verbose: bool = False
     vendor_id: int = 9583
     product_id: int = 50741
-

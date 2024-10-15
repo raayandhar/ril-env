@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import List
 
+
 @dataclass
 class XArmConfig:
     """
@@ -20,12 +21,13 @@ class XArmConfig:
     :config_param gripper_closed: position of the closed gripper (do not change unless really necessary!)
     :config_param verbose: Helpful debugging / checking print steps
     """
+
     tcp_maxacc: int = 5000
     position_gain: float = 10.0
     orientation_gain: float = 10.0
     alpha: float = 0.5
     control_loop_rate: int = 50
-    ip: str = '192.168.1.223'
+    ip: str = "192.168.1.223"
     home_pos: List[int] = field(default_factory=lambda: [0, 0, 0, 70, 0, 70, 0])
     home_speed: float = 50.0
     gripper_speed: int = 1000

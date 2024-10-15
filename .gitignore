@@ -7,7 +7,7 @@ __pycache__/
 xArm-Python-SDK/
 # C extensions
 *.so
-
+*.json
 # Distribution / packaging
 .Python
 build/
