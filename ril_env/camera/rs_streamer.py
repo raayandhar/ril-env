@@ -1,18 +1,21 @@
 import pyrealsense2 as rs
 import numpy as np
 import cv2
-from cv2 import aruco
-import imageio
+import logging
+import time
+
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.StreamHandler()],
+)
 
 
 class RealsenseStreamer:
     def __init__(self, serial_no):
-        # in-hand : 317222072157
-        # external: 317422075456
-
-        # Configure depth and color streams
+        self.serial_no = serial_no
         self.pipeline = rs.pipeline()
-
         self.config = rs.config()
 
         if serial_no is not None:
@@ -30,19 +33,11 @@ class RealsenseStreamer:
 
         self.align_to_color = rs.align(rs.stream.color)
 
-        # Start streaming
-        """
-        ctx = rs.context()
-        devices = ctx.query_devices()
-        for dev in devices:
-            dev.hardware_reset()
-        """
-        self.pipe_profile = self.pipeline.start(self.config)
+        self.start_stream()
 
         profile = self.pipeline.get_active_profile()
 
-        ## Configure depth sensor settings
-        depth_sensor = profile.get_device().query_sensors()[0]
+        depth_sensor = profile.get_device().first_depth_sensor()
         depth_sensor.set_option(rs.option.enable_auto_exposure, 1)
         depth_sensor.set_option(rs.option.depth_units, 0.001)
         preset_range = depth_sensor.get_option_range(rs.option.visual_preset)
@@ -52,21 +47,25 @@ class RealsenseStreamer:
             )
             if visualpreset == "Default":
                 depth_sensor.set_option(rs.option.visual_preset, i)
+                break
 
         color_sensor = profile.get_device().query_sensors()[1]
         color_sensor.set_option(rs.option.enable_auto_exposure, 1)
 
-        self.serial_no = serial_no
-
         if self.serial_no == "317422075456":
             color_sensor.set_option(rs.option.exposure, 140)
 
-        # Intrinsics & Extrinsics
-        frames = self.pipeline.wait_for_frames()
-        frames = self.align_to_color.process(frames)
+        # Get intrinsics & extrinsics
+        frames = self.pipeline.wait_for_frames(timeout_ms=1000)
+        aligned_frames = self.align_to_color.process(frames)
 
-        depth_frame = frames.get_depth_frame()
-        color_frame = frames.get_color_frame()
+        depth_frame = aligned_frames.get_depth_frame()
+        color_frame = aligned_frames.get_color_frame()
+
+        if not depth_frame or not color_frame:
+            logging.error("Failed to acquire initial frames.")
+            self.stop_stream()
+            raise RuntimeError("Failed to acquire initial frames.")
 
         self.depth_intrin = depth_frame.profile.as_video_stream_profile().intrinsics
         self.color_intrin = color_frame.profile.as_video_stream_profile().intrinsics
@@ -89,50 +88,78 @@ class RealsenseStreamer:
         self.temp_filter = rs.temporal_filter()
         self.hole_filling_filter = rs.hole_filling_filter()
 
-    def deproject(self, px, depth_frame):
-        u, v = px
-        depth = depth_frame.get_distance(u, v)
-        xyz = rs.rs2_deproject_pixel_to_point(self.depth_intrin, [u, v], depth)
-        return xyz
+    def start_stream(self, max_retries=5, delay=1):
+        retries = 0
+        while retries < max_retries:
+            try:
+                self.pipeline.start(self.config)
+                logging.info(f"Camera {self.serial_no} started successfully.")
+                return
+            except RuntimeError as e:
+                logging.warning(
+                    f"Attempt {retries + 1} failed to start camera {self.serial_no}: {e}"
+                )
+                retries += 1
+                time.sleep(delay)
+        logging.error(
+            f"Failed to start camera {self.serial_no} after {max_retries} attempts."
+        )
+        raise RuntimeError(
+            f"Failed to start camera {self.serial_no} after {max_retries} attempts."
+        )
 
-    def capture_rgb(self):
-        color_frame = None
-        while True:
-            frames = self.pipeline.wait_for_frames()
-            color_frame = frames.get_color_frame()
-            if color_frame is not None:
+    def capture_rgbd(self, max_retries=3, timeout_ms=1000):
+        """
+        Captures a single RGB-D frame pair.
+        Returns:
+            color_frame: The color frame object.
+            color_image: The color image as a NumPy array.
+            depth_frame: The depth frame object.
+            depth_image: The depth image as a NumPy array (colorized).
+        """
+        retries = 0
+        while retries < max_retries:
+            try:
+                frames = self.pipeline.wait_for_frames(timeout_ms=timeout_ms)
+                if not frames:
+                    raise RuntimeError("No frames received within the timeout period.")
+
+                aligned_frames = self.align_to_color.process(frames)
+                depth_frame = aligned_frames.get_depth_frame()
+                color_frame = aligned_frames.get_color_frame()
+
+                if not depth_frame or not color_frame:
+                    raise RuntimeError("Missing depth or color frame.")
+
                 color_image = np.asanyarray(color_frame.get_data())
-                break
-        return color_image
+                depth_frame_filtered = self.filter_depth(depth_frame)
+                depth_image = np.asanyarray(
+                    self.colorizer.colorize(depth_frame_filtered).get_data()
+                )
+
+                return color_frame, color_image, depth_frame_filtered, depth_image
+            except RuntimeError as e:
+                logging.warning(f"Runtime error: {e}")
+                retries += 1
+                time.sleep(1)
+        logging.error(
+            f"Failed to capture frames from {self.serial_no} after {max_retries} attempts."
+        )
+        return None, None, None, None
 
     def filter_depth(self, depth_frame):
+
         # filtered = self.dec_filter.process(depth_frame)
         # filtered = self.spat_filter.process(filtered)
-
-        filtered = depth_frame
-        # filtered = self.hole_filling_filter.process(filtered)
         # filtered = self.temp_filter.process(filtered)
-        # filtered = self.spat_filter.process(filtered)
-        return filtered.as_depth_frame()
+        # filtered = self.hole_filling_filter.process(filtered)
+        # return filtered.as_depth_frame()
 
-    def capture_rgbd(self):
-        frame_error = True
-        while frame_error:
-            try:
-                frames = self.align_to_color.process(frames)
-                depth_frame = frames.get_depth_frame()
-                color_frame = frames.get_color_frame()
-                frame_error = False
-            except:
-                frames = self.pipeline.wait_for_frames()
-                continue
-        color_image = np.asanyarray(color_frame.get_data())
-        depth_frame = self.filter_depth(depth_frame)
-        depth_image = np.asanyarray(self.colorizer.colorize(depth_frame).get_data())
-        return color_frame, color_image, depth_frame, depth_image
+        return depth_frame
 
     def stop_stream(self):
         self.pipeline.stop()
+        logging.info(f"Camera {self.serial_no} pipeline stopped.")
 
     def show_image(self, image):
         cv2.imshow("img", image)
