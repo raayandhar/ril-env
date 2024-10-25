@@ -10,6 +10,8 @@ from ril_env.xarm_env import XArmEnv, XArmConfig
 from ril_env.controller import SpaceMouse, SpaceMouseConfig
 from ril_env.camera.rs_streamer import RealsenseStreamer
 
+OVERLAY_ALPHA = 0.4  # higher means overlay recorded frames become more prominent
+
 spacemouse_cfg = SpaceMouseConfig()
 xarm_cfg = XArmConfig()
 
@@ -178,17 +180,21 @@ elif choice == "2":
             drot = drot_record[i]
             grasp = grasp_record[i]
 
-            xarm_env.step(dpos, drot, grasp)
+            # xarm_env.step(dpos, drot, grasp)
 
             ext_recorded_img = ext_rgb_img_record[i]
             int_recorded_img = int_rgb_img_record[i]
 
-            cv2.imshow("External Camera (Recorded)", ext_recorded_img)
-            cv2.imshow("Internal Camera (Recorded)", int_recorded_img)
-
             if ext_rgb_live is not None and int_rgb_live is not None:
-                cv2.imshow("External Camera (Live)", ext_rgb_live)
-                cv2.imshow("Internal Camera (Live)", int_rgb_live)
+                blended_ext_img = cv2.addWeighted(
+                    ext_rgb_live, 1 - OVERLAY_ALPHA, ext_recorded_img, OVERLAY_ALPHA, 0
+                )
+                blended_int_img = cv2.addWeighted(
+                    int_rgb_live, 1 - OVERLAY_ALPHA, int_recorded_img, OVERLAY_ALPHA, 0
+                )
+
+                cv2.imshow("External Camera (Live)", blended_ext_img)
+                cv2.imshow("Internal Camera (Live)", blended_int_img)
 
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
