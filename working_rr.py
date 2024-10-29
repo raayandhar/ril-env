@@ -172,8 +172,19 @@ elif choice == "2":
     live_image_thread.daemon = True
     live_image_thread.start()
 
+    should_ask = True
     try:
         for i in range(len(dpos_record)):
+            if should_ask:
+                continue_play = input(
+                    'Enter "continue" to non-stop play the recording and enter nothing to step the frames: '
+                )
+
+            if continue_play.lower() == "continue":
+                should_ask = False
+            elif continue_play.lower() == "":
+                print(f"Stepped frame {i}")
+
             loop_start_time = time.time()
 
             dpos = dpos_record[i]
