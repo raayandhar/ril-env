@@ -12,7 +12,7 @@ logging.basicConfig(
 )
 
 
-class RealsenseStreamer:
+class Camera:
     def __init__(self, serial_no):
         self.serial_no = serial_no
         self.pipeline = rs.pipeline()
