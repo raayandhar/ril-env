@@ -1,22 +1,31 @@
 import time
-from threading import Thread
 import cv2
 import zarr
 import numpy as np
 import sys
 import os
 
+from threading import Thread
+
 from ril_env.xarm_env import XArmEnv, XArmConfig
 from ril_env.controller import SpaceMouse, SpaceMouseConfig
-from ril_env.camera.rs_streamer import RealsenseStreamer
+from ril_env.camera import Camera, CameraConfig
 
-OVERLAY_ALPHA = 0.4  # higher means overlay recorded frames become more prominent
+camera_cfg = CameraConfig()
+
+OVERLAY_ALPHA = camera_cfg.overlay_alpha
 
 spacemouse_cfg = SpaceMouseConfig()
 xarm_cfg = XArmConfig()
 
 xarm_env = XArmEnv(xarm_cfg)
 spacemouse = SpaceMouse(spacemouse_cfg)
+
+# NOTE: we should be hiding control loop rate and control loop period inside of the xarm env
+# In general, we should simply be calling:
+# xarm.step, xarm.record, camera.record, xarm.replay, camera.replay, xarm.reset, and xarm.get_state
+# The difficult part is finding a way to handle the replay and record shared PL state, so that xarm.get_state returns what we want
+
 
 control_loop_rate = xarm_cfg.control_loop_rate
 control_loop_period = 1.0 / control_loop_rate
@@ -28,13 +37,16 @@ print("1. Record a new session")
 print("2. Replay a session")
 choice = input("Enter your choice (1 or 2): ")
 
-external_streamer = RealsenseStreamer("317422075456")
-internal_streamer = RealsenseStreamer("317222072157")
+external_streamer = Camera(camera_cfg.external_serial)
+internal_streamer = Camera(camera_cfg.internal_serial)
 
 ext_rgb_img = None
 int_rgb_img = None
 ext_rgb_live = None
 int_rgb_live = None
+
+# NOTE: these should be moved into a separate class.
+# Using global keyword is very, very bad for threading.
 
 
 def capture_images_record():
@@ -46,6 +58,10 @@ def capture_images_record():
     while True:
         _, ext_rgb_img, _, _ = external_streamer.capture_rgbd()
         _, int_rgb_img, _, _ = internal_streamer.capture_rgbd()
+
+
+# NOTE: these should be moved into a separate class.
+# Using global keyword is very, very bad for threading.
 
 
 def capture_images_live():
@@ -191,7 +207,7 @@ elif choice == "2":
             drot = drot_record[i]
             grasp = grasp_record[i]
 
-            # xarm_env.step(dpos, drot, grasp)
+            xarm_env.step(dpos, drot, grasp)
 
             ext_recorded_img = ext_rgb_img_record[i]
             int_recorded_img = int_rgb_img_record[i]
