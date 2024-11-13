@@ -3,7 +3,7 @@ import numpy as np
 import cv2
 import logging
 import time
-
+from threading import Thread, Event
 
 logging.basicConfig(
     level=logging.INFO,
@@ -33,64 +33,54 @@ class Camera:
 
         self.align_to_color = rs.align(rs.stream.color)
 
-        self.start_stream()
+        self._stop_thread = False
+        self.thread = None
+        self.color_image = None
+        self.depth_image = None
 
-        profile = self.pipeline.get_active_profile()
+        self.params_ready = Event()
 
-        depth_sensor = profile.get_device().first_depth_sensor()
-        depth_sensor.set_option(rs.option.enable_auto_exposure, 1)
-        depth_sensor.set_option(rs.option.depth_units, 0.001)
-        preset_range = depth_sensor.get_option_range(rs.option.visual_preset)
-        for i in range(int(preset_range.max)):
-            visualpreset = depth_sensor.get_option_value_description(
-                rs.option.visual_preset, i
-            )
-            if visualpreset == "Default":
-                depth_sensor.set_option(rs.option.visual_preset, i)
-                break
-
-        color_sensor = profile.get_device().query_sensors()[1]
-        color_sensor.set_option(rs.option.enable_auto_exposure, 1)
-
-        if self.serial_no == "317422075456":
-            color_sensor.set_option(rs.option.exposure, 140)
-
-        # Get intrinsics & extrinsics
-        frames = self.pipeline.wait_for_frames(timeout_ms=1000)
-        aligned_frames = self.align_to_color.process(frames)
-
-        depth_frame = aligned_frames.get_depth_frame()
-        color_frame = aligned_frames.get_color_frame()
-
-        if not depth_frame or not color_frame:
-            logging.error("Failed to acquire initial frames.")
-            self.stop_stream()
-            raise RuntimeError("Failed to acquire initial frames.")
-
-        self.depth_intrin = depth_frame.profile.as_video_stream_profile().intrinsics
-        self.color_intrin = color_frame.profile.as_video_stream_profile().intrinsics
-
-        self.depth_to_color_extrin = depth_frame.profile.get_extrinsics_to(
-            color_frame.profile
-        )
         self.colorizer = rs.colorizer()
+        self.depth_intrin = None
+        self.color_intrin = None
+        self.depth_to_color_extrin = None
+        self.K = None
 
-        self.K = np.array(
-            [
-                [self.depth_intrin.fx, 0, self.depth_intrin.ppx],
-                [0, self.depth_intrin.fy, self.depth_intrin.ppy],
-                [0, 0, 1],
-            ]
-        )
+        self.start()
 
-        self.dec_filter = rs.decimation_filter()
-        self.spat_filter = rs.spatial_filter()
-        self.temp_filter = rs.temporal_filter()
-        self.hole_filling_filter = rs.hole_filling_filter()
+        self.params_ready.wait()
+
+    def start(self):
+        self._stop_thread = False
+        self.thread = Thread(target=self._capture_frames)
+        self.thread.daemon = True
+        self.thread.start()
+
+    def stop(self):
+        self._stop_thread = True
+        if self.thread is not None:
+            self.thread.join()
+        self.stop_stream()
+
+    def _capture_frames(self):
+        try:
+            self.start_stream()
+            self._initialize_camera_params()
+            self.params_ready.set()
+
+            while not self._stop_thread:
+                color_image, depth_image = self.capture_rgbd()
+                if color_image is not None and depth_image is not None:
+                    self.color_image = color_image
+                    self.depth_image = depth_image
+                time.sleep(0.01)  # Manual thread safety?
+        except Exception as e:
+            logging.error(f"Error in capture thread for camera {self.serial_no}: {e}")
+            self.params_ready.set()
 
     def start_stream(self, max_retries=5, delay=1):
         retries = 0
-        while retries < max_retries:
+        while retries < max_retries and not self._stop_thread:
             try:
                 self.pipeline.start(self.config)
                 logging.info(f"Camera {self.serial_no} started successfully.")
@@ -109,16 +99,8 @@ class Camera:
         )
 
     def capture_rgbd(self, max_retries=3, timeout_ms=1000):
-        """
-        Captures a single RGB-D frame pair.
-        Returns:
-            color_frame: The color frame object.
-            color_image: The color image as a NumPy array.
-            depth_frame: The depth frame object.
-            depth_image: The depth image as a NumPy array (colorized).
-        """
         retries = 0
-        while retries < max_retries:
+        while retries < max_retries and not self._stop_thread:
             try:
                 frames = self.pipeline.wait_for_frames(timeout_ms=timeout_ms)
                 if not frames:
@@ -132,45 +114,63 @@ class Camera:
                     raise RuntimeError("Missing depth or color frame.")
 
                 color_image = np.asanyarray(color_frame.get_data())
-                depth_frame_filtered = self.filter_depth(depth_frame)
-                depth_image = np.asanyarray(
-                    self.colorizer.colorize(depth_frame_filtered).get_data()
-                )
+                # We could use depth filtering here
+                depth_image = np.asanyarray(depth_frame.get_data())
 
-                return color_frame, color_image, depth_frame_filtered, depth_image
+                return color_image, depth_image
             except RuntimeError as e:
                 logging.warning(f"Runtime error: {e}")
                 retries += 1
-                time.sleep(1)
+                time.sleep(0.1)
         logging.error(
             f"Failed to capture frames from {self.serial_no} after {max_retries} attempts."
         )
-        return None, None, None, None
+        return None, None
 
     def filter_depth(self, depth_frame):
-
-        # filtered = self.dec_filter.process(depth_frame)
-        # filtered = self.spat_filter.process(filtered)
-        # filtered = self.temp_filter.process(filtered)
-        # filtered = self.hole_filling_filter.process(filtered)
-        # return filtered.as_depth_frame()
-
+        # Removed for now
         return depth_frame
 
     def stop_stream(self):
-        self.pipeline.stop()
-        logging.info(f"Camera {self.serial_no} pipeline stopped.")
+        try:
+            self.pipeline.stop()
+            logging.info(f"Camera {self.serial_no} pipeline stopped.")
+        except Exception as e:
+            logging.error(f"Error stopping camera {self.serial_no}: {e}")
 
-    def show_image(self, image):
-        cv2.imshow("img", image)
-        cv2.waitKey(0)
+    def _initialize_camera_params(self):
+        for _ in range(10):
+            if self._stop_thread:
+                return
+            frames = self.pipeline.wait_for_frames(timeout_ms=1000)
+            aligned_frames = self.align_to_color.process(frames)
 
+            depth_frame = aligned_frames.get_depth_frame()
+            color_frame = aligned_frames.get_color_frame()
 
-if __name__ == "__main__":
-    realsense_streamer = RealsenseStreamer("317422075456")
+            if depth_frame and color_frame:
+                self.depth_intrin = (
+                    depth_frame.profile.as_video_stream_profile().intrinsics
+                )
+                self.color_intrin = (
+                    color_frame.profile.as_video_stream_profile().intrinsics
+                )
 
-    frames = []
-    while True:
-        _, rgb_image, depth_frame, depth_img = realsense_streamer.capture_rgbd()
-        cv2.waitKey(1)
-        cv2.imshow("img", rgb_image)
+                self.depth_to_color_extrin = depth_frame.profile.get_extrinsics_to(
+                    color_frame.profile
+                )
+
+                self.K = np.array(
+                    [
+                        [self.depth_intrin.fx, 0, self.depth_intrin.ppx],
+                        [0, self.depth_intrin.fy, self.depth_intrin.ppy],
+                        [0, 0, 1],
+                    ]
+                )
+                logging.info(f"Camera {self.serial_no} parameters initialized.")
+                return
+            time.sleep(0.1)
+        logging.error(f"Failed to initialize camera parameters for {self.serial_no}.")
+        raise RuntimeError(
+            f"Failed to initialize camera parameters for {self.serial_no}."
+        )
