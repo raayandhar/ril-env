@@ -29,6 +29,10 @@ class XArmEnv:
         self.previous_grasp = None
         self.gripper_open = self.config.gripper_open
         self.gripper_closed = self.config.gripper_closed
+        self.control_loop_period = 1.0 / self.config.control_loop_rate
+        self.dpos = None
+        self.drot = None
+        self.grasp = None
 
         self.verbose = self.config.verbose
 
@@ -68,6 +72,10 @@ class XArmEnv:
         print("Replay started.")
 
     def step(self, dpos, drot, grasp):
+        # dpos = controller_state["dpos"] * self.config.position_gain
+        # drot = controller_state["raw_drotation"] * self.config.orientation_gain
+        # grasp = controller_state["grasp"]
+
         if not self.init:
             print("Error: Arm not initialized.")
             return
@@ -80,7 +88,6 @@ class XArmEnv:
                 grasp = action["grasp"]
                 self.replay_index += 1
                 time.sleep(0.005)
-                # time.sleep(0.1)
             else:
                 self.is_replaying = False
                 print("Replay finished.")
