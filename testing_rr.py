@@ -94,7 +94,6 @@ def record_session():
 def replay_session():
     xarm_env._arm_reset()
     filename = input("Enter filename of the recording to load (e.g., recording.zarr): ")
-
     if not filename.endswith(".zarr"):
         filename += ".zarr"
 
@@ -110,8 +109,6 @@ def replay_session():
     grasp_record = zarr_store["grasp"][:]
     timestamp_record = zarr_store["timestamps"][:]
 
-    print("Replaying the session... Press Ctrl+C to stop.")
-
     external_camera = Camera(serial_no=camera_cfg.external_serial)
     internal_camera = Camera(serial_no=camera_cfg.internal_serial)
 
@@ -120,24 +117,6 @@ def replay_session():
 
     try:
         for i in range(len(dpos_record)):
-            if should_ask:
-                continue_play = input(
-                    'Enter "continue" to non-stop play the recording and enter nothing to step the frames: '
-                )
-
-            if continue_play.lower() == "continue":
-                should_ask = False
-            elif continue_play == "":
-                print(f"Stepped frame {i}")
-
-            loop_start_time = time.time()
-
-            dpos = dpos_record[i]
-            drot = drot_record[i]
-            grasp = grasp_record[i]
-
-            xarm_env.step(dpos, drot, grasp)
-
             ext_recorded_img = ext_rgb_img_record[i]
             int_recorded_img = int_rgb_img_record[i]
 
@@ -163,6 +142,12 @@ def replay_session():
                 cv2.imshow("External Camera (Live)", blended_ext_img)
                 cv2.imshow("Internal Camera (Live)", blended_int_img)
 
+            dpos = dpos_record[i]
+            drot = drot_record[i]
+            grasp = grasp_record[i]
+
+            xarm_env.step(dpos, drot, grasp)
+
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
 
@@ -171,8 +156,93 @@ def replay_session():
                 time.sleep(max(0.0, time_diff))
             else:
                 time.sleep(xarm_env.control_loop_period)
-
         print("Replay completed.")
+    except KeyboardInterrupt:
+        print("\nReplay interrupted by user.")
+    except Exception as e:
+        print(f"An error occurred during replay: {e}")
+    finally:
+        external_camera.stop()
+        internal_camera.stop()
+        xarm_env._arm_reset()
+
+
+def select_frames_overlay():
+    xarm_env._arm_reset()
+    filename = input("Enter filename of the recording to load (e.g., recording.zarr): ")
+    if not filename.endswith(".zarr"):
+        filename += ".zarr"
+
+    if not os.path.exists(filename):
+        print(f"File '{filename}' does not exist. Exiting.")
+        sys.exit(1)
+
+    zarr_store = zarr.open(filename, mode="r")
+    ext_rgb_img_record = zarr_store["external_images"][:]
+    int_rgb_img_record = zarr_store["internal_images"][:]
+    dpos_record = zarr_store["dpos"][:]
+    drot_record = zarr_store["drot"][:]
+    grasp_record = zarr_store["grasp"][:]
+    timestamp_record = zarr_store["timestamps"][:]
+
+    external_camera = Camera(serial_no=camera_cfg.external_serial)
+    internal_camera = Camera(serial_no=camera_cfg.internal_serial)
+
+    should_ask = True
+    continue_play = ""
+
+    try:
+        ext_recorded_img = None
+        int_recorded_img = None
+
+        try:
+            for i in range(len(dpos_record)):
+                ext_recorded_img = ext_rgb_img_record[i]
+                int_recorded_img = int_rgb_img_record[i]
+
+                cv2.imshow("External Camera (Overlay)", ext_recorded_img)
+                cv2.imshow("Internal Camera (Overlay)", int_recorded_img)
+
+                if cv2.waitKey(1) & 0xFF == ord("q"):
+                    break
+
+                if i < len(timestamp_record) - 1:
+                    time_diff = timestamp_record[i + 1] - timestamp_record[i]
+                    time.sleep(max(0.0, time_diff))
+                else:
+                    time.sleep(xarm_env.control_loop_period)
+        except KeyboardInterrupt:
+            while True:
+                if (
+                    external_camera.color_image is not None
+                    and internal_camera.color_image is not None
+                ):
+                    blended_ext_img = cv2.addWeighted(
+                        external_camera.color_image,
+                        1 - OVERLAY_ALPHA,
+                        ext_recorded_img,
+                        OVERLAY_ALPHA,
+                        0,
+                    )
+                    blended_int_img = cv2.addWeighted(
+                        internal_camera.color_image,
+                        1 - OVERLAY_ALPHA,
+                        int_recorded_img,
+                        OVERLAY_ALPHA,
+                        0,
+                    )
+
+                    cv2.imshow("External Camera (Overlay)", blended_ext_img)
+                    cv2.imshow("Internal Camera (Overlay)", blended_int_img)
+
+                if cv2.waitKey(1) & 0xFF == ord("q"):
+                    break
+
+                if i < len(timestamp_record) - 1:
+                    time_diff = timestamp_record[i + 1] - timestamp_record[i]
+                    time.sleep(max(0.0, time_diff))
+                else:
+                    time.sleep(xarm_env.control_loop_period)
     except KeyboardInterrupt:
         print("\nReplay interrupted by user.")
     except Exception as e:
@@ -223,12 +293,15 @@ def main():
     print("Select an option:")
     print("1. Record a new session")
     print("2. Replay a session")
-    choice = input("Enter your choice (1 or 2): ")
+    print("3. Select frames and overlay")
+    choice = input("Enter your choice (1, 2, or 3): ")
 
     if choice == "1":
         record_session()
     elif choice == "2":
         replay_session()
+    elif choice == "3":
+        select_frames_overlay()
     else:
         print("Invalid choice. Exiting.")
     cv2.destroyAllWindows()
