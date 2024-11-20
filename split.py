@@ -18,6 +18,15 @@ OVERLAY_ALPHA = camera_cfg.overlay_alpha
 xarm_env = XArmEnv(xarm_cfg)
 spacemouse = SpaceMouse(spacemouse_cfg)
 
+"""
+Need to split this into two scripts!
+one for xarm, one for camera
+we want to run one (Xarm) on the NUC (connected via i.e., ssh), one (camera) on the desktop
+both should record their parts, and then store in a common location on the desktop.
+When we replay (2) or use frames (3), we can do it on the desktop. Right now let's just focus on getting the record session 
+split between xarm and camera, but still synced for recording.
+"""
+
 
 def record_session():
     xarm_env._arm_reset()
