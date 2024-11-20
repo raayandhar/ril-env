@@ -4,7 +4,7 @@ import zarr
 import numpy as np
 import sys
 import os
-from threading import Thread
+
 from ril_env.xarm_env import XArmEnv, XArmConfig
 from ril_env.controller import SpaceMouse, SpaceMouseConfig
 from ril_env.camera import Camera, CameraConfig
