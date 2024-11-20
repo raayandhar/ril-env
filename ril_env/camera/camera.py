@@ -1,6 +1,5 @@
 import pyrealsense2 as rs
 import numpy as np
-import cv2
 import logging
 import time
 from threading import Thread, Event
