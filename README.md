@@ -5,6 +5,8 @@ Currently, **ril-env** supports record-replay of the xArm 7 robotic arm on a sin
 
 More features will be added soon; see the issues tab under the repository.
 
+![System Design](system_design.png)
+
 ## Installation
 **ril-env** is tested on  Ubuntu Linux with Python 3.
 
@@ -32,6 +34,8 @@ pip install -e .
 
 Ensure that the arm is enabled on the machine you will run the relevant script on.
 
-To run both the perception and xArm 7 robotic arm, you can use the `joint_script.py` script.
+To run both the perception and xArm 7 robotic arm, you can use the `joint_script.py` script. 
 
 To run perception and the robotic arm seperately, you can either run `xarm_script.py` and `camera_script.py` seperately, or to run them simultaneously, you can run the `record.sh` shell script from the desktop. Currently, the script is **hardcoded** for a specific NUC and desktop.
+
+You can access nearly all of the parameters for the APIs through their respective config dataclasses. Then, when writing or using a script, you simply need to specify what parameters to change and what to change them to when the `config()` object is being created. 
