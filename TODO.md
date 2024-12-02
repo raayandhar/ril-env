@@ -2,6 +2,8 @@
 
 
 ISSUES (post on the ISSUEs tab in the repo):
+
+Added as an issue:
 - need to run an xarm.step that takes input from the desktop and
   communicates it to the NUC
   - need to make spacemouse connect to desktop and run from there
@@ -13,9 +15,12 @@ ISSUES (post on the ISSUEs tab in the repo):
     agnostic of whether you run sim or real, i.e., should use the same
     class / inherit from base class. Design decision here.
 - consider or support alternatives to `zarr` files -> design discussion
+- - test installation
+
+Will be added later:
 - boil down all functionality to simple primitives: `.get_state`
   (return pose + images), `.get_obs`, `.step`, etc; all scripts are
   very messy right now
 - better recordings, easy interopability with other codebases/policy implementations
 - better code; best practices, CLI, logging and debugging; documentation
-- test installation
+
