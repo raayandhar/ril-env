@@ -2,10 +2,10 @@ from setuptools import setup, find_packages
 
 setup(
     name="ril-env",
-    version="0.1.0",
+    version="1.0.1",
     description="Environment and controller functionality and scripts",
     author="Raayan Dhar",
-    author_email="raayan.dhar@gmail.com",
+    author_email="raayandhar@g.ucla.edu",
     packages=find_packages(include=["ril_env", "ril_env.*"]),
     install_requires=[],
     extras_require={

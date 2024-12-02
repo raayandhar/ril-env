@@ -42,40 +42,7 @@ class XArmEnv:
         self.is_replaying = False
         self.replay_index = 0
 
-    # split recording off from this XArmEnv
-    # encapsulate the logic for step so it doesn't need to pass in dpos, drot
-    def start_recording(self):
-        self.recording = []
-        self.is_recording = True
-        print("Recording started.")
-
-    def stop_recording(self):
-        self.is_recording = False
-        print("Recording stopped.")
-
-    def save_recording(self, filename):
-        with open(filename, "w") as f:
-            json.dump(self.recording, f)
-        print(f"Recording saved to {filename}.")
-
-    def load_recording(self, filename):
-        with open(filename, "r") as f:
-            self.recording = json.load(f)
-        print(f"Recording loaded from {filename}.")
-
-    def start_replay(self):
-        if not self.recording:
-            print("No recording loaded.")
-            return
-        self.is_replaying = True
-        self.replay_index = 0
-        print("Replay started.")
-
     def step(self, dpos, drot, grasp):
-        # dpos = controller_state["dpos"] * self.config.position_gain
-        # drot = controller_state["raw_drotation"] * self.config.orientation_gain
-        # grasp = controller_state["grasp"]
-
         if not self.init:
             print("Error: Arm not initialized.")
             return
