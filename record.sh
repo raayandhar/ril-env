@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# This is all hardcoded!!
+
 if [ "$#" -lt 2 ]; then
     echo "Usage: $0 xarm_filename camera_filename"
     exit 1
