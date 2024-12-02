@@ -13,6 +13,8 @@ xarm_cfg = XArmConfig()
 OVERLAY_ALPHA = 0.5
 
 xarm_env = XArmEnv(xarm_cfg)
+
+# Spacemouse should be seperated; the communication should be desktop sending .step message to robot arm
 spacemouse = SpaceMouse(spacemouse_cfg)
 
 
