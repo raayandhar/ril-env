@@ -1,24 +1,21 @@
 # ril-env
 
-TODO:
-- documentation
-- fix replay.py (replaying)
-- get overlay working
-- get selecting specific frames working
-- fix and cleanup the classes
-- simulation, setup xarm env, etc for SIM
-- script stores files into one named directory instead (collate zarrs?)
-- get_state -> can't be done for record (separate computers), but
-  could possible be done for replay, have to see
 
-TODO
-- Add more to this readme
-- Add more comments to the code
-- Setup a setup.py/setuptools and fix imports
-- Camera calibration (?)
-- A reset method to get back to home pose
-- CLI arguments (https://click.palletsprojects.com/en/8.1.x/)
-- get_state() -> return pose + images
-- record and replay actions
-- more recording metrics; easy to get monitor (graphs for modeling
-  trajectories, etc)
+ISSUES (post on the ISSUEs tab in the repo):
+- need to run an xarm.step that takes input from the desktop and
+  communicates it to the NUC
+  - need to make spacemouse connect to desktop and run from there
+    instead of from NUC
+- replay.py is missing (prev. version does not work) for the seperated code
+  - need to have overlay and same features as joint replay
+- simulation
+  - (Edward) work on simulation; everything should be relatively
+    agnostic of whether you run sim or real, i.e., should use the same
+    class / inherit from base class. Design decision here.
+- consider or support alternatives to `zarr` files -> design discussion
+- boil down all functionality to simple primitives: `.get_state`
+  (return pose + images), `.get_obs`, `.step`, etc; all scripts are
+  very messy right now
+- better recordings, easy interopability with other codebases/policy implementations
+- better code; best practices, CLI, logging and debugging; documentation
+- test installation
