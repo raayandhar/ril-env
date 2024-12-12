@@ -1,0 +1,3 @@
+opencv-python
+hidapi
+pyrealsense2
