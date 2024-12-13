@@ -27,8 +27,8 @@ conda install --file requirements.txt
 ```
 Finally, set up the package:
 ```
-python setup.py
-pip install -e .
+python setup.py install
+pip install -e . # duplicate?
 ```
 ## Basic Usage
 
