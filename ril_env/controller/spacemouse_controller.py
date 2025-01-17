@@ -104,18 +104,18 @@ class SpaceMouse:
                         self.z = convert(d[5], d[6]) * -1.0
 
                     elif d[0] == 2:
-                        self.roll = convert(d[1], d[2])
-                        self.pitch = -convert(d[3], d[4])
-                        self.yaw = -convert(d[5], d[6])
+                        self.roll = -convert(d[5], d[6])
+                        self.pitch = convert(d[1], d[2])
+                        self.yaw = convert(d[3], d[4])
 
                         with self.lock:
                             self._control = [
                                 self.x,
                                 self.y,
                                 self.z,
-                                self.roll,
+                                self.yaw,                              
                                 self.pitch,
-                                self.yaw,
+                                self.roll,
                             ]
                         if self.verbose:
                             print(f"Control values: {self._control}")
