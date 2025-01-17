@@ -21,11 +21,10 @@ class XArmEnv:
         if not self.init:
             print("Failed to initialize the arm.")
             sys.exit(1)
-        _, initial_pose = self.arm.get_position(is_radian=False)
+        
         self.home_pos = self.config.home_pos
         self.home_speed = self.config.home_speed
-        self.current_position = np.array(initial_pose[:3])
-        self.current_orientation = np.array(initial_pose[3:])
+        
         self.previous_grasp = None
         self.gripper_open = self.config.gripper_open
         self.gripper_closed = self.config.gripper_closed
@@ -41,6 +40,8 @@ class XArmEnv:
         self.is_recording = False
         self.is_replaying = False
         self.replay_index = 0
+
+        self._arm_reset()
 
     def step(self, dpos, drot, grasp):
         if not self.init:
@@ -170,3 +171,7 @@ class XArmEnv:
         ret = arm.set_state(0)
         if ret != 0:
             print(f"Error in set_state: {ret}")
+
+        _, initial_pose = self.arm.get_position(is_radian=False)
+        self.current_position = np.array(initial_pose[:3])
+        self.current_orientation = np.array(initial_pose[3:])
