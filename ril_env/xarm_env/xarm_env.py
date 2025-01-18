@@ -35,6 +35,7 @@ class XArmEnv:
 
         self.verbose = self.config.verbose
 
+        # TODO: recording logic should not be in env
         # temp testing for recording
         self.recording = []
         self.is_recording = False
@@ -62,7 +63,8 @@ class XArmEnv:
                 return
 
         arm = self.arm
-        self.current_position += dpos
+        # TODO: these are target pose, not current...
+        self.current_position += dpos 
         self.current_orientation += drot
 
         if self.verbose:
