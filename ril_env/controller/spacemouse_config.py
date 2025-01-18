@@ -13,7 +13,7 @@ class SpaceMouseConfig:
     :config_param verbose: adds helpful debugging print statements
     """
 
-    pos_sensitivity: float = 5.0
+    pos_sensitivity: float = 25.0
     rot_sensitivity: float = 2.0
     verbose: bool = False
     vendor_id: int = 9583
