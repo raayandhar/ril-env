@@ -1,4 +1,4 @@
-name: xarm
+name: rilenv
 channels:
   - conda-forge
   - defaults
