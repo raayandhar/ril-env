@@ -14,9 +14,13 @@ To get started, first clone the repository.
 ```
 git clone https://github.com/UCLA-Robot-Intelligence-Lab/ril-env.git
 ```
-To use this repository with the physical xArm 7 robotic arm, you must use the
+This repository uses the `xarm` folder from the [xArm-Python-Sdk](https://github.com/xArm-Developer/xArm-Python-SDK)
+package. If there are any issues, it is recommended that you do the
+following:
+
+First remove the `xarm` folder. Using the
 [xArm-Python-Sdk](https://github.com/xArm-Developer/xArm-Python-SDK)
-package. Follow the instructions on that repo and install the package
+package, follow the instructions on that repo and install the package
 at the root of this repository. Then after installing, move the `xarm` folder into the
 root repository and remove `xArm-Python-Sdk`.
 
