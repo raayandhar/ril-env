@@ -7,6 +7,14 @@ More features will be added soon; see the issues tab under the repository.
 
 ![System Design](system_design.png)
 
+## Having trouble connecting?
+Run the following
+```
+sudo ip addr add 192.168.1.100/24 dev enp2s0
+sudo ip link set enp2s0 up
+sudo ip route add 192.168.1.223 dev enp2s0
+```
+
 ## Installation
 **ril-env** is tested on Ubuntu Linux with Python 3.
 
