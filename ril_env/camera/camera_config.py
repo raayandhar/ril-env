@@ -16,5 +16,6 @@ class CameraConfig:
 
     internal_serial: str = "317222072157"
     external_serial: str = "317422075456"
+    external_2_serial: str = "317422074281"
 
     overlay_alpha: float = 0.4
