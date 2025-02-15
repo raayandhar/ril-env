@@ -26,9 +26,11 @@ def record_session():
     filename = input("Enter filename to save the recording (save as .zarr): ")
 
     external_camera = Camera(serial_no=camera_cfg.external_serial)
+    external_camera_2 = Camera(serial_no=camera_cfg.external_2_serial)
     internal_camera = Camera(serial_no=camera_cfg.internal_serial)
 
     ext_rgb_img_record = []
+    ext_2_rgb_img_record = []
     int_rgb_img_record = []
     dpos_record = []
     drot_record = []
@@ -50,6 +52,7 @@ def record_session():
                 and internal_camera.color_image is not None
             ):
                 cv2.imshow("External Camera (Recording)", external_camera.color_image)
+                cv2.imshow("External Camera 2 (Recording)", external_camera_2.color_image)
                 cv2.imshow("Internal Camera (Recording)", internal_camera.color_image)
                 if cv2.waitKey(1) & 0xFF == ord("q"):
                     break
@@ -57,6 +60,11 @@ def record_session():
             ext_rgb_img_record.append(
                 external_camera.color_image.copy()
                 if external_camera.color_image is not None
+                else np.zeros((480, 640, 3), dtype=np.uint8)
+            )
+            ext_2_rgb_img_record.append(
+                external_camera_2.color_image.copy()
+                if external_camera_2.color_image is not None
                 else np.zeros((480, 640, 3), dtype=np.uint8)
             )
             int_rgb_img_record.append(
@@ -77,10 +85,12 @@ def record_session():
         print("\nRecording stopped by user.")
 
     external_camera.stop()
+    external_camera_2.stop()
     internal_camera.stop()
 
     save_recording(
         ext_rgb_img_record,
+        ext_2_rgb_img_record,
         int_rgb_img_record,
         dpos_record,
         drot_record,
@@ -103,6 +113,7 @@ def replay_session():
 
     zarr_store = zarr.open(filename, mode="r")
     ext_rgb_img_record = zarr_store["external_images"][:]
+    ext_2_rgb_img_record = zarr_store["external_2_images"][:]
     int_rgb_img_record = zarr_store["internal_images"][:]
     dpos_record = zarr_store["dpos"][:]
     drot_record = zarr_store["drot"][:]
@@ -110,6 +121,7 @@ def replay_session():
     timestamp_record = zarr_store["timestamps"][:]
 
     external_camera = Camera(serial_no=camera_cfg.external_serial)
+    external_camera_2 = Camera(serial_no=camera_cfg.external_2_serial)
     internal_camera = Camera(serial_no=camera_cfg.internal_serial)
 
     should_ask = True
@@ -118,16 +130,25 @@ def replay_session():
     try:
         for i in range(len(dpos_record)):
             ext_recorded_img = ext_rgb_img_record[i]
+            ext_2_recorded_img = ext_2_rgb_img_record[i]
             int_recorded_img = int_rgb_img_record[i]
 
             if (
                 external_camera.color_image is not None
+                and external_camera_2.color_image is not None
                 and internal_camera.color_image is not None
             ):
                 blended_ext_img = cv2.addWeighted(
                     external_camera.color_image,
                     1 - OVERLAY_ALPHA,
                     ext_recorded_img,
+                    OVERLAY_ALPHA,
+                    0,
+                )
+                blended_ext_2_img = cv2.addWeighted(
+                    external_camera_2.color_image,
+                    1 - OVERLAY_ALPHA,
+                    ext_2_recorded_img,
                     OVERLAY_ALPHA,
                     0,
                 )
@@ -140,6 +161,7 @@ def replay_session():
                 )
 
                 cv2.imshow("External Camera (Live)", blended_ext_img)
+                cv2.imshow("External Camera 2 (Live)", blended_ext_2_img)
                 cv2.imshow("Internal Camera (Live)", blended_int_img)
 
             dpos = dpos_record[i]
@@ -163,6 +185,7 @@ def replay_session():
         print(f"An error occurred during replay: {e}")
     finally:
         external_camera.stop()
+        external_camera_2.stop()
         internal_camera.stop()
         xarm_env._arm_reset()
 
@@ -179,6 +202,7 @@ def select_frames_overlay():
 
     zarr_store = zarr.open(filename, mode="r")
     ext_rgb_img_record = zarr_store["external_images"][:]
+    ext_2_rgb_img_record = zarr_store["external_2_images"][:]
     int_rgb_img_record = zarr_store["internal_images"][:]
     dpos_record = zarr_store["dpos"][:]
     drot_record = zarr_store["drot"][:]
@@ -186,6 +210,7 @@ def select_frames_overlay():
     timestamp_record = zarr_store["timestamps"][:]
 
     external_camera = Camera(serial_no=camera_cfg.external_serial)
+    external_camera_2 = Camera(serial_no=camera_cfg.external_2_serial)
     internal_camera = Camera(serial_no=camera_cfg.internal_serial)
 
     should_ask = True
@@ -198,9 +223,11 @@ def select_frames_overlay():
         try:
             for i in range(len(dpos_record)):
                 ext_recorded_img = ext_rgb_img_record[i]
+                ext_2_recorded_img = ext_2_rgb_img_record[i]
                 int_recorded_img = int_rgb_img_record[i]
 
                 cv2.imshow("External Camera (Overlay)", ext_recorded_img)
+                cv2.imshow("External Camera 2 (Overlay)", ext_2_recorded_img)
                 cv2.imshow("Internal Camera (Overlay)", int_recorded_img)
 
                 if cv2.waitKey(1) & 0xFF == ord("q"):
@@ -215,12 +242,20 @@ def select_frames_overlay():
             while True:
                 if (
                     external_camera.color_image is not None
+                    and external_camera_2.color_image is not None
                     and internal_camera.color_image is not None
                 ):
                     blended_ext_img = cv2.addWeighted(
                         external_camera.color_image,
                         1 - OVERLAY_ALPHA,
                         ext_recorded_img,
+                        OVERLAY_ALPHA,
+                        0,
+                    )
+                    blended_ext_2_img = cv2.addWeighted(
+                        external_camera_2.color_image,
+                        1 - OVERLAY_ALPHA,
+                        ext_2_recorded_img,
                         OVERLAY_ALPHA,
                         0,
                     )
@@ -233,6 +268,7 @@ def select_frames_overlay():
                     )
 
                     cv2.imshow("External Camera (Overlay)", blended_ext_img)
+                    cv2.imshow("External Camera 2 (Overlay)", blended_ext_2_img)
                     cv2.imshow("Internal Camera (Overlay)", blended_int_img)
 
                 if cv2.waitKey(1) & 0xFF == ord("q"):
@@ -249,12 +285,14 @@ def select_frames_overlay():
         print(f"An error occurred during replay: {e}")
     finally:
         external_camera.stop()
+        external_camera_2.stop()
         internal_camera.stop()
         xarm_env._arm_reset()
 
 
 def save_recording(
     ext_rgb_imgs,
+    ext_2_rgb_imgs,
     int_rgb_imgs,
     dpos_record,
     drot_record,
@@ -266,6 +304,7 @@ def save_recording(
         filename += ".zarr"
 
     ext_rgb_imgs = np.array(ext_rgb_imgs, dtype=np.uint8)
+    ext_2_rgb_imgs = np.array(ext_2_rgb_imgs, dtype=np.uint8)
     int_rgb_imgs = np.array(int_rgb_imgs, dtype=np.uint8)
     dpos_record = np.array(dpos_record, dtype=np.float32)
     drot_record = np.array(drot_record, dtype=np.float32)
@@ -275,6 +314,9 @@ def save_recording(
     zarr_store = zarr.open(filename, mode="w")
     zarr_store.create_dataset(
         "external_images", data=ext_rgb_imgs, chunks=(1, 480, 640, 3), dtype="uint8"
+    )
+    zarr_store.create_dataset(
+        "external_2_images", data=ext_2_rgb_imgs, chunks=(1, 480, 640, 3), dtype="uint8"
     )
     zarr_store.create_dataset(
         "internal_images", data=int_rgb_imgs, chunks=(1, 480, 640, 3), dtype="uint8"
