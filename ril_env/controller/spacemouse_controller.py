@@ -29,11 +29,14 @@ class SpaceMouse:
 
         self._control = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         self._reset_state = 0
-        self.rotation = np.array([[-1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, -1.0]])
+        self.rotation = np.array([[-1.0, 0.0, 0.0],
+                                  [0.0, 1.0, 0.0],
+                                  [0.0, 0.0, -1.0]])
         self._enabled = True
 
-        self.lock = threading.Lock()  # Thread safety is important!
+        self.lock = threading.Lock()
 
+        self._running = True
         self.thread = threading.Thread(target=self.run)
         self.thread.daemon = True
         self.thread.start()
@@ -50,13 +53,13 @@ class SpaceMouse:
         print_command("Left button", "toggle gripper open/close")
         print_command("Move mouse laterally", "move arm horizontally in x-y plane")
         print_command("Move mouse vertically", "move arm vertically")
-        print_command(
-            "Twist mouse about an axis", "rotate arm about a corresponding axis"
-        )
+        print_command("Twist mouse about an axis", "rotate arm about a corresponding axis")
         print("")
 
     def _reset_internal_state(self):
-        self.rotation = np.array([[-1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, -1.0]])
+        self.rotation = np.array([[-1.0, 0.0, 0.0],
+                                  [0.0, 1.0, 0.0],
+                                  [0.0, 0.0, -1.0]])
         self.x, self.y, self.z = 0, 0, 0
         self.roll, self.pitch, self.yaw = 0, 0, 0
         self._control = np.zeros(6)
@@ -69,10 +72,9 @@ class SpaceMouse:
 
     def get_controller_state(self):
         with self.lock:
-            control = self.control.copy()
+            control = np.array(self._control.copy())
             grasp = self.grasp
 
-        # Increased scaling factors
         dpos = control[:3] * 0.05 * self.pos_sensitivity
         roll, pitch, yaw = control[3:] * 0.05 * self.rot_sensitivity
 
@@ -91,7 +93,7 @@ class SpaceMouse:
         )
 
     def run(self):
-        while True:
+        while self._running:
             d = self.device.read(13)
             if d is not None and self._enabled:
                 if self.verbose:
@@ -113,7 +115,7 @@ class SpaceMouse:
                                 self.x,
                                 self.y,
                                 self.z,
-                                self.yaw,                              
+                                self.yaw,
                                 self.pitch,
                                 self.roll,
                             ]
@@ -166,3 +168,14 @@ class SpaceMouse:
             return "close"
         else:
             return "open"
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self._running = False
+        self.thread.join(timeout=0.5)
+        try:
+            self.device.close()
+        except Exception as e:
+            print("Error closing HID device:", e)
