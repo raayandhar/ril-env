@@ -1,5 +1,4 @@
 import numpy as np
-import json
 import time
 import sys
 import os
@@ -21,10 +20,10 @@ class XArmEnv:
         if not self.init:
             print("Failed to initialize the arm.")
             sys.exit(1)
-        
+
         self.home_pos = self.config.home_pos
         self.home_speed = self.config.home_speed
-        
+
         self.previous_grasp = None
         self.gripper_open = self.config.gripper_open
         self.gripper_closed = self.config.gripper_closed
@@ -64,7 +63,7 @@ class XArmEnv:
 
         arm = self.arm
         # TODO: these are target pose, not current...
-        self.current_position += dpos 
+        self.current_position += dpos
         self.current_orientation += drot
 
         if self.verbose:
