@@ -18,7 +18,6 @@ OVERLAY_ALPHA = camera_cfg.overlay_alpha
 xarm_env = XArmEnv(xarm_cfg)
 spacemouse = SpaceMouse(spacemouse_cfg)
 
-
 def record_session():
     xarm_env._arm_reset()
     print("Recording... Press Ctrl+C to stop.")
@@ -80,7 +79,6 @@ def record_session():
             elapsed_time = time.time() - loop_start_time
             sleep_time = max(0.0, xarm_env.control_loop_period - elapsed_time)
             time.sleep(sleep_time)
-
     except KeyboardInterrupt:
         print("\nRecording stopped by user.")
 
