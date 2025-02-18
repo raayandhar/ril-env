@@ -18,7 +18,6 @@ OVERLAY_ALPHA = camera_cfg.overlay_alpha
 xarm_env = XArmEnv(xarm_cfg)
 spacemouse = SpaceMouse(spacemouse_cfg)
 
-
 def record_session():
     xarm_env._arm_reset()
     print("Recording... Press Ctrl+C to stop.")
@@ -38,6 +37,9 @@ def record_session():
     timestamp_record = []
 
     try:
+        last_print_time = time.time()
+        loops_since_print = 0
+
         while True:
             loop_start_time = time.time()
 
@@ -45,41 +47,36 @@ def record_session():
             dpos = controller_state["dpos"] * xarm_cfg.position_gain
             drot = controller_state["raw_drotation"] * xarm_cfg.orientation_gain
             grasp = controller_state["grasp"]
+
             xarm_env.step(dpos, drot, grasp)
 
-            if (
-                external_camera.color_image is not None
-                and internal_camera.color_image is not None
-            ):
+            if (external_camera.color_image is not None
+                and internal_camera.color_image is not None):
                 cv2.imshow("External Camera (Recording)", external_camera.color_image)
                 cv2.imshow("External Camera 2 (Recording)", external_camera_2.color_image)
                 cv2.imshow("Internal Camera (Recording)", internal_camera.color_image)
                 if cv2.waitKey(1) & 0xFF == ord("q"):
                     break
 
+            # store data
             ext_rgb_img_record.append(
                 external_camera.color_image.copy()
                 if external_camera.color_image is not None
                 else np.zeros((480, 640, 3), dtype=np.uint8)
             )
-            ext_2_rgb_img_record.append(
-                external_camera_2.color_image.copy()
-                if external_camera_2.color_image is not None
-                else np.zeros((480, 640, 3), dtype=np.uint8)
-            )
-            int_rgb_img_record.append(
-                internal_camera.color_image.copy()
-                if internal_camera.color_image is not None
-                else np.zeros((480, 640, 3), dtype=np.uint8)
-            )
-            dpos_record.append(dpos.copy())
-            drot_record.append(drot.copy())
-            grasp_record.append(grasp)
             timestamp_record.append(loop_start_time)
 
             elapsed_time = time.time() - loop_start_time
             sleep_time = max(0.0, xarm_env.control_loop_period - elapsed_time)
             time.sleep(sleep_time)
+
+            loops_since_print += 1
+            now = time.time()
+            if now - last_print_time >= 1.0:
+                freq_measured = loops_since_print / (now - last_print_time)
+                print(f"Current loop frequency: {freq_measured:.2f} Hz")
+                loops_since_print = 0
+                last_print_time = now
 
     except KeyboardInterrupt:
         print("\nRecording stopped by user.")
