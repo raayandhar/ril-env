@@ -65,6 +65,13 @@ class Spacemouse(Thread):
             ],
             dtype=dtype,
         )
+        """
+        self.tx_zup_spnav = np.array([
+            [0,0,-1],
+            [1,0,0],
+            [0,1,0]
+        ], dtype=dtype)
+        """
 
     def get_motion_state(self):
         me = self.motion_event
@@ -86,6 +93,8 @@ class Spacemouse(Thread):
         """
         state = self.get_motion_state()
         tf_state = np.zeros_like(state)
+        #tf_state[:3] = self.tx_zup_spnav @ state[:3]
+        #tf_state[3:] = self.tx_zup_spnav @ state[3:]
         tf_state[:3] = self.tx_translation @ state[:3]
         tf_state[3:] = self.tx_rotation @ state[3:]
         return tf_state

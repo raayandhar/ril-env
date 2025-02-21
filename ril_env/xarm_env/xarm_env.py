@@ -2,6 +2,7 @@ import numpy as np
 import time
 import sys
 import os
+import scipy.spatial.transform as st
 
 # TODO: issue with relative import
 from xarm.wrapper import XArmAPI
@@ -62,13 +63,17 @@ class XArmEnv:
                 return
 
         arm = self.arm
-        # TODO: these are target pose, not current...
         self.current_position += dpos
-        self.current_orientation += drot
+
+        # just use degrees on everything
+        curr_rot = st.Rotation.from_euler('xyz', self.current_orientation, degrees=True)
+        delta_rot = st.Rotation.from_euler('xyz', drot, degrees=True)
+        updated_rot = delta_rot * curr_rot
+        self.current_orientation = updated_rot.as_euler('xyz', degrees=True)
 
         if self.verbose:
             print(f"Current position: {self.current_position} \n")
-            print(f"Current orientation: {self.current_orientation} \n")
+            print(f"Current orientation: {self.current_orientation} \n")  # in degrees
 
         ret = arm.set_servo_cartesian(
             np.concatenate((self.current_position, self.current_orientation)),
