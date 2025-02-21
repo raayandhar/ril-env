@@ -8,13 +8,15 @@
 
 from serial.tools import list_ports
 
+
 def _dump_port(d):
-    print('-' * 80)
-    print('  device     : {}'.format(d.device))
-    print('  hwid       : {}'.format(d.hwid))
-    print('  product    : {}'.format(d.hwid))
-    print('  description: {}'.format(d.hwid))
-    print('-' * 80)
+    print("-" * 80)
+    print("  device     : {}".format(d.device))
+    print("  hwid       : {}".format(d.hwid))
+    print("  product    : {}".format(d.hwid))
+    print("  description: {}".format(d.hwid))
+    print("-" * 80)
+
 
 def get_ports(is_dump=True):
     ports = []
@@ -23,17 +25,19 @@ def get_ports(is_dump=True):
         if i.pid is not None:
             if is_dump:
                 _dump_port(i)
-            ports.append({
-                'pid': '{:04x}'.format(i.pid),
-                'vid': '{:04x}'.format(i.vid),
-                'device': i.device,
-                'serial_number': i.serial_number,
-                'hwid': i.hwid,
-                'name': i.name,
-                'description': i.description,
-                'interface': i.interface,
-                'location': i.location,
-                'manufacturer': i.manufacturer,
-                'product': i.product
-            })
+            ports.append(
+                {
+                    "pid": "{:04x}".format(i.pid),
+                    "vid": "{:04x}".format(i.vid),
+                    "device": i.device,
+                    "serial_number": i.serial_number,
+                    "hwid": i.hwid,
+                    "name": i.name,
+                    "description": i.description,
+                    "interface": i.interface,
+                    "location": i.location,
+                    "manufacturer": i.manufacturer,
+                    "product": i.product,
+                }
+            )
     return ports

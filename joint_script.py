@@ -6,17 +6,15 @@ import sys
 import os
 
 from ril_env.xarm_env import XArmEnv, XArmConfig
-from ril_env.controller import SpaceMouse, SpaceMouseConfig
 from ril_env.camera import Camera, CameraConfig
+from ril_env.controller.spacemouse import Spacemouse
 
-spacemouse_cfg = SpaceMouseConfig()
-xarm_cfg = XArmConfig()
+# Configuration
 camera_cfg = CameraConfig()
-
+xarm_cfg = XArmConfig()
 OVERLAY_ALPHA = camera_cfg.overlay_alpha
-
 xarm_env = XArmEnv(xarm_cfg)
-spacemouse = SpaceMouse(spacemouse_cfg)
+
 
 def record_session():
     xarm_env._arm_reset()
@@ -36,51 +34,64 @@ def record_session():
     grasp_record = []
     timestamp_record = []
 
-    try:
-        while True:
-            loop_start_time = time.time()
+    # Use the new Spacemouse in a context manager and use monotonic timing.
+    with Spacemouse(deadzone=0.5) as sm:
+        try:
+            while True:
+                loop_start = time.monotonic()
 
-            controller_state = spacemouse.get_controller_state()
-            dpos = controller_state["dpos"] * xarm_cfg.position_gain
-            drot = controller_state["raw_drotation"] * xarm_cfg.orientation_gain
-            grasp = controller_state["grasp"]
-            xarm_env.step(dpos, drot, grasp)
+                # Get the transformed motion state from the new Spacemouse.
+                sm_state = sm.get_motion_state_transformed()
+                dpos = sm_state[:3] * xarm_cfg.position_gain
+                drot = sm_state[3:] * xarm_cfg.orientation_gain
+                grasp = sm.grasp
 
-            if (
-                external_camera.color_image is not None
-                and internal_camera.color_image is not None
-            ):
-                cv2.imshow("External Camera (Recording)", external_camera.color_image)
-                cv2.imshow("External Camera 2 (Recording)", external_camera_2.color_image)
-                cv2.imshow("Internal Camera (Recording)", internal_camera.color_image)
-                if cv2.waitKey(1) & 0xFF == ord("q"):
-                    break
+                xarm_env.step(dpos, drot, grasp)
 
-            ext_rgb_img_record.append(
-                external_camera.color_image.copy()
-                if external_camera.color_image is not None
-                else np.zeros((480, 640, 3), dtype=np.uint8)
-            )
-            ext_2_rgb_img_record.append(
-                external_camera_2.color_image.copy()
-                if external_camera_2.color_image is not None
-                else np.zeros((480, 640, 3), dtype=np.uint8)
-            )
-            int_rgb_img_record.append(
-                internal_camera.color_image.copy()
-                if internal_camera.color_image is not None
-                else np.zeros((480, 640, 3), dtype=np.uint8)
-            )
-            dpos_record.append(dpos.copy())
-            drot_record.append(drot.copy())
-            grasp_record.append(grasp)
-            timestamp_record.append(loop_start_time)
+                # Display camera feeds if available
+                if (
+                    external_camera.color_image is not None
+                    and internal_camera.color_image is not None
+                ):
+                    cv2.imshow(
+                        "External Camera (Recording)", external_camera.color_image
+                    )
+                    cv2.imshow(
+                        "External Camera 2 (Recording)", external_camera_2.color_image
+                    )
+                    cv2.imshow(
+                        "Internal Camera (Recording)", internal_camera.color_image
+                    )
+                    if cv2.waitKey(1) & 0xFF == ord("q"):
+                        break
 
-            elapsed_time = time.time() - loop_start_time
-            sleep_time = max(0.0, xarm_env.control_loop_period - elapsed_time)
-            time.sleep(sleep_time)
-    except KeyboardInterrupt:
-        print("\nRecording stopped by user.")
+                # Record images and control data
+                ext_rgb_img_record.append(
+                    external_camera.color_image.copy()
+                    if external_camera.color_image is not None
+                    else np.zeros((480, 640, 3), dtype=np.uint8)
+                )
+                ext_2_rgb_img_record.append(
+                    external_camera_2.color_image.copy()
+                    if external_camera_2.color_image is not None
+                    else np.zeros((480, 640, 3), dtype=np.uint8)
+                )
+                int_rgb_img_record.append(
+                    internal_camera.color_image.copy()
+                    if internal_camera.color_image is not None
+                    else np.zeros((480, 640, 3), dtype=np.uint8)
+                )
+                dpos_record.append(dpos.copy())
+                drot_record.append(drot.copy())
+                grasp_record.append(grasp)
+                timestamp_record.append(loop_start)
+
+                # Use monotonic time to compute elapsed time and adjust sleep
+                elapsed = time.monotonic() - loop_start
+                sleep_time = max(0.0, xarm_env.control_loop_period - elapsed)
+                time.sleep(sleep_time)
+        except KeyboardInterrupt:
+            print("\nRecording stopped by user.")
 
     external_camera.stop()
     external_camera_2.stop()
@@ -122,11 +133,9 @@ def replay_session():
     external_camera_2 = Camera(serial_no=camera_cfg.external_2_serial)
     internal_camera = Camera(serial_no=camera_cfg.internal_serial)
 
-    should_ask = True
-    continue_play = ""
-
     try:
         for i in range(len(dpos_record)):
+            loop_start = time.monotonic()
             ext_recorded_img = ext_rgb_img_record[i]
             ext_2_recorded_img = ext_2_rgb_img_record[i]
             int_recorded_img = int_rgb_img_record[i]
@@ -171,11 +180,15 @@ def replay_session():
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
 
+            # Use the recorded time differences for smoother replay
             if i < len(timestamp_record) - 1:
                 time_diff = timestamp_record[i + 1] - timestamp_record[i]
                 time.sleep(max(0.0, time_diff))
             else:
                 time.sleep(xarm_env.control_loop_period)
+
+            # Optionally, adjust for any loop overhead in replay if needed:
+            elapsed = time.monotonic() - loop_start
         print("Replay completed.")
     except KeyboardInterrupt:
         print("\nReplay interrupted by user.")
@@ -211,76 +224,29 @@ def select_frames_overlay():
     external_camera_2 = Camera(serial_no=camera_cfg.external_2_serial)
     internal_camera = Camera(serial_no=camera_cfg.internal_serial)
 
-    should_ask = True
-    continue_play = ""
-
     try:
-        ext_recorded_img = None
-        int_recorded_img = None
+        for i in range(len(dpos_record)):
+            ext_recorded_img = ext_rgb_img_record[i]
+            ext_2_recorded_img = ext_2_rgb_img_record[i]
+            int_recorded_img = int_rgb_img_record[i]
 
-        try:
-            for i in range(len(dpos_record)):
-                ext_recorded_img = ext_rgb_img_record[i]
-                ext_2_recorded_img = ext_2_rgb_img_record[i]
-                int_recorded_img = int_rgb_img_record[i]
+            cv2.imshow("External Camera (Overlay)", ext_recorded_img)
+            cv2.imshow("External Camera 2 (Overlay)", ext_2_recorded_img)
+            cv2.imshow("Internal Camera (Overlay)", int_recorded_img)
 
-                cv2.imshow("External Camera (Overlay)", ext_recorded_img)
-                cv2.imshow("External Camera 2 (Overlay)", ext_2_recorded_img)
-                cv2.imshow("Internal Camera (Overlay)", int_recorded_img)
+            if cv2.waitKey(1) & 0xFF == ord("q"):
+                break
 
-                if cv2.waitKey(1) & 0xFF == ord("q"):
-                    break
-
-                if i < len(timestamp_record) - 1:
-                    time_diff = timestamp_record[i + 1] - timestamp_record[i]
-                    time.sleep(max(0.0, time_diff))
-                else:
-                    time.sleep(xarm_env.control_loop_period)
-        except KeyboardInterrupt:
-            while True:
-                if (
-                    external_camera.color_image is not None
-                    and external_camera_2.color_image is not None
-                    and internal_camera.color_image is not None
-                ):
-                    blended_ext_img = cv2.addWeighted(
-                        external_camera.color_image,
-                        1 - OVERLAY_ALPHA,
-                        ext_recorded_img,
-                        OVERLAY_ALPHA,
-                        0,
-                    )
-                    blended_ext_2_img = cv2.addWeighted(
-                        external_camera_2.color_image,
-                        1 - OVERLAY_ALPHA,
-                        ext_2_recorded_img,
-                        OVERLAY_ALPHA,
-                        0,
-                    )
-                    blended_int_img = cv2.addWeighted(
-                        internal_camera.color_image,
-                        1 - OVERLAY_ALPHA,
-                        int_recorded_img,
-                        OVERLAY_ALPHA,
-                        0,
-                    )
-
-                    cv2.imshow("External Camera (Overlay)", blended_ext_img)
-                    cv2.imshow("External Camera 2 (Overlay)", blended_ext_2_img)
-                    cv2.imshow("Internal Camera (Overlay)", blended_int_img)
-
-                if cv2.waitKey(1) & 0xFF == ord("q"):
-                    break
-
-                if i < len(timestamp_record) - 1:
-                    time_diff = timestamp_record[i + 1] - timestamp_record[i]
-                    time.sleep(max(0.0, time_diff))
-                else:
-                    time.sleep(xarm_env.control_loop_period)
+            if i < len(timestamp_record) - 1:
+                time_diff = timestamp_record[i + 1] - timestamp_record[i]
+                time.sleep(max(0.0, time_diff))
+            else:
+                time.sleep(xarm_env.control_loop_period)
+        print("Overlay completed.")
     except KeyboardInterrupt:
-        print("\nReplay interrupted by user.")
+        print("\nOverlay interrupted by user.")
     except Exception as e:
-        print(f"An error occurred during replay: {e}")
+        print(f"An error occurred during overlay: {e}")
     finally:
         external_camera.stop()
         external_camera_2.stop()

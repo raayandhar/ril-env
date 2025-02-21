@@ -50,12 +50,12 @@ from ..config.x_config import XCONF
 
 
 def get_all_ips():
-    addrs = ['localhost', '127.0.0.1']
+    addrs = ["localhost", "127.0.0.1"]
     addrs = set(addrs)
     try:
         for ip in socket.gethostbyname_ex(socket.gethostname())[2]:
             try:
-                if not ip.startswith('127.'):
+                if not ip.startswith("127."):
                     addrs.add(ip)
             except:
                 pass
@@ -64,7 +64,7 @@ def get_all_ips():
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.settimeout(3)
-        sock.connect(('8.8.8.8', 53))
+        sock.connect(("8.8.8.8", 53))
         addrs.add(sock.getsockname()[0])
     except:
         pass
@@ -78,33 +78,48 @@ class HeartBeatThread(threading.Thread):
         self.daemon = True
 
     def run(self):
-        logger.debug('{} heartbeat thread start'.format(self.sock_class.port_type))
+        logger.debug("{} heartbeat thread start".format(self.sock_class.port_type))
         heat_data = bytes([0, 0, 0, 1, 0, 2, 0, 0])
 
         while self.sock_class.connected:
             if self.sock_class.write(heat_data) == -1:
                 break
             time.sleep(1)
-        logger.debug('{} heartbeat thread had stopped'.format(self.sock_class.port_type))
+        logger.debug(
+            "{} heartbeat thread had stopped".format(self.sock_class.port_type)
+        )
 
 
 class SocketPort(Port):
-    def __init__(self, server_ip, server_port, rxque_max=XCONF.SocketConf.TCP_RX_QUE_MAX, heartbeat=False,
-                 buffer_size=XCONF.SocketConf.TCP_CONTROL_BUF_SIZE, forbid_uds=False, fb_que=None):
-        is_main_tcp = server_port == XCONF.SocketConf.TCP_CONTROL_PORT or server_port == XCONF.SocketConf.TCP_CONTROL_PORT + 1
+    def __init__(
+        self,
+        server_ip,
+        server_port,
+        rxque_max=XCONF.SocketConf.TCP_RX_QUE_MAX,
+        heartbeat=False,
+        buffer_size=XCONF.SocketConf.TCP_CONTROL_BUF_SIZE,
+        forbid_uds=False,
+        fb_que=None,
+    ):
+        is_main_tcp = (
+            server_port == XCONF.SocketConf.TCP_CONTROL_PORT
+            or server_port == XCONF.SocketConf.TCP_CONTROL_PORT + 1
+        )
         super(SocketPort, self).__init__(rxque_max, fb_que)
         if is_main_tcp:
-            self.port_type = 'main-socket'
+            self.port_type = "main-socket"
             # self.com.setsockopt(socket.SOL_SOCKET, socket.SO_RCVTIMEO, 5)
         else:
-            self.port_type = 'report-socket'
+            self.port_type = "report-socket"
         try:
             socket.setdefaulttimeout(1)
             use_uds = False
             # if not forbid_uds and platform.system() == 'Linux' and is_xarm_local_ip(server_ip):
             # if not forbid_uds and platform.system() == 'Linux' and server_ip in get_all_ips():
-            if not forbid_uds and platform.system() == 'Linux':
-                uds_path = os.path.join('/tmp/xarmcontroller_uds_{}'.format(server_port))
+            if not forbid_uds and platform.system() == "Linux":
+                uds_path = os.path.join(
+                    "/tmp/xarmcontroller_uds_{}".format(server_port)
+                )
                 if os.path.exists(uds_path):
                     try:
                         self.com = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -112,7 +127,11 @@ class SocketPort(Port):
                         self.com.setblocking(True)
                         self.com.settimeout(1)
                         self.com.connect(uds_path)
-                        logger.info('{} connect {} success, uds_{}'.format(self.port_type, server_ip, server_port))
+                        logger.info(
+                            "{} connect {} success, uds_{}".format(
+                                self.port_type, server_ip, server_port
+                            )
+                        )
                         use_uds = True
                     except Exception as e:
                         pass
@@ -129,7 +148,7 @@ class SocketPort(Port):
                 self.com.setblocking(True)
                 self.com.settimeout(1)
                 self.com.connect((server_ip, server_port))
-                logger.info('{} connect {} success'.format(self.port_type, server_ip))
+                logger.info("{} connect {} success".format(self.port_type, server_ip))
                 # logger.info('{} connect {}:{} success'.format(self.port_type, server_ip, server_port))
 
             self._connected = True
@@ -144,7 +163,6 @@ class SocketPort(Port):
                 self.heartbeat_thread = HeartBeatThread(self)
                 self.heartbeat_thread.start()
         except Exception as e:
-            logger.info('{} connect {} failed, {}'.format(self.port_type, server_ip, e))
+            logger.info("{} connect {} failed, {}".format(self.port_type, server_ip, e))
             # logger.error('{} connect {}:{} failed, {}'.format(self.port_type, server_ip, server_port, e))
             self._connected = False
-
