@@ -9,12 +9,18 @@ from scipy.spatial.transform import Rotation as R
 from rs_streamer import RealsenseStreamer
 from calib_utils.linalg_utils import transform
 
-#from pynput import keyboard
+# from pynput import keyboard
 
 import argparse
 
 
-GRIPPER_SPEED, GRIPPER_FORCE, GRIPPER_MAX_WIDTH, GRIPPER_TOLERANCE = 0.1, 40, 0.08570, 0.01
+GRIPPER_SPEED, GRIPPER_FORCE, GRIPPER_MAX_WIDTH, GRIPPER_TOLERANCE = (
+    0.1,
+    40,
+    0.08570,
+    0.01,
+)
+
 
 class PixelSelector:
     def __init__(self):
@@ -27,7 +33,7 @@ class PixelSelector:
             self.img = cv2.resize(cropped_img, (640, 480))
 
     def crop_at_point(self, img, x, y, width=640, height=480):
-        img = img[y:y+height, x:x+width]
+        img = img[y : y + height, x : x + width]
         return img
 
     def mouse_callback(self, event, x, y, flags, param):
@@ -39,13 +45,14 @@ class PixelSelector:
     def run(self, img):
         self.load_image(img)
         self.clicks = []
-        cv2.namedWindow('pixel_selector')
-        cv2.setMouseCallback('pixel_selector', self.mouse_callback)
+        cv2.namedWindow("pixel_selector")
+        cv2.setMouseCallback("pixel_selector", self.mouse_callback)
         while True:
             k = cv2.waitKey(20) & 0xFF
             if k == 27:
                 break
         return self.clicks
+
 
 def goto(robot, realsense_streamer, pixel_selector, TCR, refine=False):
     # right
@@ -57,58 +64,64 @@ def goto(robot, realsense_streamer, pixel_selector, TCR, refine=False):
         _, rgb_image, depth_frame, depth_img = realsense_streamer.capture_rgbd()
 
     pixels = pixel_selector.run(rgb_image)
-    waypoint_cam = 1000.0*np.array(realsense_streamer.deproject(pixels[0], depth_frame))
-    waypoint_rob = transform(np.array(waypoint_cam).reshape(1,3), TCR)
+    waypoint_cam = 1000.0 * np.array(
+        realsense_streamer.deproject(pixels[0], depth_frame)
+    )
+    waypoint_rob = transform(np.array(waypoint_cam).reshape(1, 3), TCR)
 
     # Get waypoints in robot frame
-    ee_pos_desired =np.array(waypoint_rob)[0]
+    ee_pos_desired = np.array(waypoint_rob)[0]
     print(ee_pos_desired)
-    lift_pos = ee_pos_desired +np.array([0,0,50])
+    lift_pos = ee_pos_desired + np.array([0, 0, 50])
 
     # Put robot in canonical orientation
     robot.go_home()
     ee_pos, ee_euler = robot.pose_ee()
 
     state_log = robot.move_to_ee_pose(
-        ee_pos, ee_euler, 
+        ee_pos,
+        ee_euler,
     )
     _, ee_euler = robot.pose_ee()
     # # #
 
-
     state_log = robot.move_to_ee_pose(
-        lift_pos, ee_euler, 
+        lift_pos,
+        ee_euler,
     )
 
     state_log = robot.move_to_ee_pose(
-        ee_pos_desired, ee_euler, 
+        ee_pos_desired,
+        ee_euler,
     )
 
     state_log = robot.move_to_ee_pose(
-        lift_pos, ee_euler, 
+        lift_pos,
+        ee_euler,
     )
 
-    #if refine:
+    # if refine:
     #    CALIB_OFFSET = teleop(robot)
     #    TCR[:,3] += CALIB_OFFSET
-    #else:
+    # else:
     #    state_log = robot.set_ee_pose(
-    #        position=ee_pos_desired, orientation=ee_quat, 
+    #        position=ee_pos_desired, orientation=ee_quat,
     #    )
 
     #    state_log = robot.set_ee_pose(
-    #        position=lift_pos, orientation=ee_quat, 
+    #        position=lift_pos, orientation=ee_quat,
     #    )
 
     return TCR
 
-if __name__ == "__main__":
-    serial_no = '317422075456'
 
-    # Get camera, load transforms, load robot 
+if __name__ == "__main__":
+    serial_no = "317422075456"
+
+    # Get camera, load transforms, load robot
     realsense_streamer = RealsenseStreamer(serial_no)
-    transforms = np.load('calib/transforms.npy', allow_pickle=True).item()
-    TCR = transforms[serial_no]['tcr']
+    transforms = np.load("calib/transforms.npy", allow_pickle=True).item()
+    TCR = transforms[serial_no]["tcr"]
 
     robot = XarmEnv()
 
@@ -117,9 +130,9 @@ if __name__ == "__main__":
 
     # Test going to a waypoint
     TCR = goto(robot, realsense_streamer, pixel_selector, TCR, refine=True)
-    transforms[serial_no]['tcr'] = TCR
+    transforms[serial_no]["tcr"] = TCR
 
-    res = input('save?')
-    if res == 'y' or res == 'Y':
-        np.save('calib/transforms.npy', transforms)
-        print('SAVED')
+    res = input("save?")
+    if res == "y" or res == "Y":
+        np.save("calib/transforms.npy", transforms)
+        print("SAVED")

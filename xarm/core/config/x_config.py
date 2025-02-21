@@ -52,14 +52,14 @@ class XCONF(object):
                     (-2.059488, 2.094395),  # (-2.18, 2.18),
                     (-3.92699, 0.191986),  # (-4.01, 0.1),
                     (-1.692969, math.pi),  # (-1.75, math.pi),
-                    (-2 * math.pi, 2 * math.pi)
+                    (-2 * math.pi, 2 * math.pi),
                 ],
                 Type.XARM5_X4_1305: [
                     (-2 * math.pi, 2 * math.pi),
                     (-2.042035, 2.024581),
                     (-3.822271, 0.174532),
                     (-1.692969, math.pi),  # (-1.75, math.pi),
-                    (-2 * math.pi, 2 * math.pi)
+                    (-2 * math.pi, 2 * math.pi),
                 ],
             },
             Axis.XARM6: {
@@ -69,7 +69,7 @@ class XCONF(object):
                     (-3.92699, 0.191986),  # (-4.01, 0.1),
                     (-2 * math.pi, 2 * math.pi),
                     (-1.692969, math.pi),  # (-1.75, math.pi),
-                    (-2 * math.pi, 2 * math.pi)
+                    (-2 * math.pi, 2 * math.pi),
                 ],
                 Type.XARM6_X4_1305: [
                     (-2 * math.pi, 2 * math.pi),
@@ -77,7 +77,7 @@ class XCONF(object):
                     (-3.822271, 0.174532),
                     (-2 * math.pi, 2 * math.pi),
                     (-1.692969, math.pi),  # (-1.75, math.pi),
-                    (-2 * math.pi, 2 * math.pi)
+                    (-2 * math.pi, 2 * math.pi),
                 ],
                 Type.XARM6_X8: [
                     (-2 * math.pi, 2 * math.pi),
@@ -85,7 +85,7 @@ class XCONF(object):
                     (-0.191986, 3.92699),
                     (-2 * math.pi, 2 * math.pi),
                     (-1.692969, math.pi),  # (-1.75, math.pi),
-                    (-2 * math.pi, 2 * math.pi)
+                    (-2 * math.pi, 2 * math.pi),
                 ],
                 Type.XARM6_X9: [
                     (-2 * math.pi, 2 * math.pi),
@@ -111,7 +111,6 @@ class XCONF(object):
                     (-2.1642082724729685, 2.1642082724729685),
                     (-2 * math.pi, 2 * math.pi),
                 ],
-
             },
             Axis.XARM7: {
                 Type.XARM7_X3: [
@@ -121,7 +120,7 @@ class XCONF(object):
                     (-3.92699, 0.191986),  # (-4.01, 0.1),
                     (-2 * math.pi, 2 * math.pi),
                     (-1.692969, math.pi),  # (-1.75, math.pi),
-                    (-2 * math.pi, 2 * math.pi)
+                    (-2 * math.pi, 2 * math.pi),
                 ],
                 Type.XARM7_X4: [
                     (-2 * math.pi, 2 * math.pi),
@@ -130,7 +129,7 @@ class XCONF(object):
                     (-0.191986, 3.92699),  # (-0.1, 4.01),
                     (-2 * math.pi, 2 * math.pi),
                     (-1.692969, math.pi),  # (-1.75, math.pi),
-                    (-2 * math.pi, 2 * math.pi)
+                    (-2 * math.pi, 2 * math.pi),
                 ],
                 Type.XARM7_X4_1305: [
                     (-2 * math.pi, 2 * math.pi),
@@ -139,7 +138,7 @@ class XCONF(object):
                     (-0.10472, 3.92699),
                     (-2 * math.pi, 2 * math.pi),
                     (-1.692969, math.pi),  # (-1.75, math.pi),
-                    (-2 * math.pi, 2 * math.pi)
+                    (-2 * math.pi, 2 * math.pi),
                 ],
                 Type.XARM7_X13: [
                     (-2 * math.pi, 2 * math.pi),
@@ -147,10 +146,10 @@ class XCONF(object):
                     (-2 * math.pi, 2 * math.pi),
                     (-3.92699, 0.191986),
                     (-2 * math.pi, 2 * math.pi),
-                    (-math.pi, 1.692969), 
-                    (-2 * math.pi, 2 * math.pi)
-                ]
-            }
+                    (-math.pi, 1.692969),
+                    (-2 * math.pi, 2 * math.pi),
+                ],
+            },
         }
         TCP_LIMITS = {
             Axis.XARM5: {
@@ -160,7 +159,7 @@ class XCONF(object):
                     (-400, 1000),
                     (math.pi, math.pi),
                     (0, 0),
-                    (-math.pi, math.pi)
+                    (-math.pi, math.pi),
                 ],
             },
             Axis.XARM6: {
@@ -170,7 +169,7 @@ class XCONF(object):
                     (-400, 1000),
                     (-math.pi, math.pi),
                     (-math.pi, math.pi),
-                    (-math.pi, math.pi)
+                    (-math.pi, math.pi),
                 ],
                 Type.XARM6_X4: [
                     (-750, 750),
@@ -178,7 +177,7 @@ class XCONF(object):
                     (-400, 1000),
                     (-math.pi, math.pi),
                     (-math.pi, math.pi),
-                    (-math.pi, math.pi)
+                    (-math.pi, math.pi),
                 ],
                 Type.XARM6_X8: [
                     (-1000, 1000),
@@ -186,7 +185,7 @@ class XCONF(object):
                     (-600, 1200),
                     (-math.pi, math.pi),
                     (-math.pi, math.pi),
-                    (-math.pi, math.pi)
+                    (-math.pi, math.pi),
                 ],
                 Type.XARM6_X9: [
                     (-500, 500),
@@ -194,7 +193,7 @@ class XCONF(object):
                     (-150, 750),
                     (-math.pi, math.pi),
                     (-math.pi, math.pi),
-                    (-math.pi, math.pi)
+                    (-math.pi, math.pi),
                 ],
                 Type.XARM6_X11: [
                     (-900, 900),
@@ -202,7 +201,7 @@ class XCONF(object):
                     (-900, 1200),
                     (-math.pi, math.pi),
                     (-math.pi, math.pi),
-                    (-math.pi, math.pi)
+                    (-math.pi, math.pi),
                 ],
                 Type.XARM6_X12: [
                     (-1000, 1000),
@@ -210,7 +209,7 @@ class XCONF(object):
                     (-400, 1300),
                     (-math.pi, math.pi),
                     (-math.pi, math.pi),
-                    (-math.pi, math.pi)
+                    (-math.pi, math.pi),
                 ],
             },
             Axis.XARM7: {
@@ -220,7 +219,7 @@ class XCONF(object):
                     (-400, 1000),
                     (-math.pi, math.pi),
                     (-math.pi, math.pi),
-                    (-math.pi, math.pi)
+                    (-math.pi, math.pi),
                 ],
                 Type.XARM7_X4: [
                     (-750, 750),
@@ -228,7 +227,7 @@ class XCONF(object):
                     (-400, 1000),
                     (-math.pi, math.pi),
                     (-math.pi, math.pi),
-                    (-math.pi, math.pi)
+                    (-math.pi, math.pi),
                 ],
                 Type.XARM7_X13: [
                     (-750, 750),
@@ -236,9 +235,9 @@ class XCONF(object):
                     (-400, 1000),
                     (-math.pi, math.pi),
                     (-math.pi, math.pi),
-                    (-math.pi, math.pi)
-                ]
-            }
+                    (-math.pi, math.pi),
+                ],
+            },
         }
 
     class SerialConf:
@@ -415,7 +414,7 @@ class XCONF(object):
         IMPEDANCE_CTRL_MBK = 210
         IMPEDANCE_CTRL_CONFIG = 211
         FTSENSOR_GET_CONFIG = 212
-        
+
         GET_TRAJ_SPEEDING = 230
         GET_MAX_JOINT_VELOCITY = 231
         SET_COMMON_PARAM = 232
@@ -466,9 +465,9 @@ class XCONF(object):
         MT_ID = 0x1600
         BAUDRATE = 0x0601
         SOFT_REBOOT = 0x0607
-        TAGET_TOQ = 0x050a
-        CURR_TOQ = 0x050c
-        TOQ_SPD = 0x050e
+        TAGET_TOQ = 0x050A
+        CURR_TOQ = 0x050C
+        TOQ_SPD = 0x050E
         TAGET_POS = 0x0700
         CURR_POS = 0x0702
         HARD_VER = 0x0800
@@ -536,7 +535,7 @@ class XCONF(object):
         USE_PRIMITIVES = 20  # just for judgement, threshold.
         CYLINDER = 21  # radius, height
         BOX = 22  # x, y, z in tool coordinate direction
-    
+
     class FeedbackType:
         MOTION_START = 1
         MOTION_FINISH = 2
@@ -548,6 +547,3 @@ class XCONF(object):
         SUCCESS = 0
         FAILURE = 1
         DISCARD = 2
-
-
-

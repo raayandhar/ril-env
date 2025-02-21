@@ -174,4 +174,6 @@ dependencies:
       - widgetsnbextension==4.0.13
       - xarm-python-sdk==1.14.7
       - zipp==3.20.2
+      - pip install spnav@https://github.com/cheng-chi/spnav/archive/c1c938ebe3cc542db4685e0d13850ff1abfdb943.tar.gz
+
 prefix: /home/u-ril/miniconda3/envs/rilenv
