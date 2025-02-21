@@ -23,8 +23,8 @@ class XArmConfig:
     """
 
     tcp_maxacc: int = 5000
-    position_gain: float = 10.0
-    orientation_gain: float = 10.0
+    position_gain: float = 2.0
+    orientation_gain: float = 2.0
     alpha: float = 0.5
     control_loop_rate: int = 50
     ip: str = "192.168.1.223"

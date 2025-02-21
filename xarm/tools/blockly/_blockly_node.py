@@ -17,17 +17,17 @@ class _BlocklyNode(object):
     def __init__(self, xml_path):
         self._root = ET.parse(xml_path).getroot()
         self._ns = self.__get_ns()
-    
+
     def __get_ns(self):
         try:
-            r = re.compile('({.+})')
+            r = re.compile("({.+})")
             if r.search(self._root.tag) is not None:
                 ns = r.search(self._root.tag).group(1)
             else:
-                ns = ''
+                ns = ""
         except Exception as e:
-            print('get namespace exception: {}'.format(e))
-            ns = ''
+            print("get namespace exception: {}".format(e))
+            ns = ""
         return ns
 
     def _get_node(self, tag, root=None):
@@ -52,10 +52,9 @@ class _BlocklyNode(object):
         Only call in studio
         """
         return self._get_node(tag, root=root)
-    
+
     def get_nodes(self, tag, root=None, descendant=False, **kwargs):
         """
         Only call in studio
         """
         return self._get_nodes(tag, root=root, descendant=descendant, **kwargs)
- 
