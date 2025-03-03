@@ -34,7 +34,7 @@ root repository and remove `xArm-Python-Sdk`.
 
 Create the conda (recommended) environment. Replace `rilenv` your preferred name for the environment. Run this at the root of your repository:
 ```
-conda create -n rilenv -f environment.yml
+conda env create -n rilenv -f environment.yml
 ```
 Finally, set up the package:
 ```

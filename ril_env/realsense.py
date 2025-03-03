@@ -476,14 +476,14 @@ class SingleRealsense(mp.Process):
             print(f"[SingleRealsense {self.serial_number}] Exiting worker process.")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     with SharedMemoryManager() as shm_manager:
         # Get connected RealSense devices (only D400 series are considered).
         serials = SingleRealsense.get_connected_devices_serial()
         if not serials:
             print("No RealSense devices found.")
             exit(1)
-        
+
         # Select the first available camera.
         serial = serials[0]
         print(serials[0])
@@ -496,7 +496,7 @@ if __name__ == '__main__':
             serial_number=serial,  # note: parameter name in the constructor is 'serial_numer'
             resolution=(1280, 720),
             capture_fps=30,
-            verbose=True
+            verbose=True,
         )
 
         # Start the camera process and wait until it's ready.
