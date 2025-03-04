@@ -385,12 +385,14 @@ class SingleRealsense(mp.Process):
                         # put_data['timestamp'] = put_start_time + step_idx / self.put_fps
                         put_data["timestamp"] = receive_time
                         # print(step_idx, data['timestamp'])
-                        self.ring_buffer.put(put_data, wait=False)
+                        # SWITCHED TO wait=True
+                        self.ring_buffer.put(put_data, wait=True)
                 else:
                     step_idx = int((receive_time - put_start_time) * self.put_fps)
                     put_data["step_idx"] = step_idx
                     put_data["timestamp"] = receive_time
-                    self.ring_buffer.put(put_data, wait=False)
+                    # SWITCHED TO wait=True
+                    self.ring_buffer.put(put_data, wait=True)
 
                 # signal ready
                 if iter_idx == 0:
