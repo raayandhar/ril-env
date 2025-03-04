@@ -223,7 +223,7 @@ def repeat_to_list(x, n: int, cls):
     return x
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
     with SharedMemoryManager() as shm_manager:
         serials = SingleRealsense.get_connected_devices_serial()
@@ -238,7 +238,7 @@ if __name__ == '__main__':
             shm_manager=shm_manager,
             resolution=(1280, 720),
             capture_fps=30,
-            verbose=True
+            verbose=True,
         )
 
         multi_camera.start(wait=True)
