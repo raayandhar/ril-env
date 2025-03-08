@@ -15,17 +15,25 @@ def main():
     video_dir.mkdir(parents=True, exist_ok=True)
 
     video_recorder = VideoRecorder.create_h264(
-        fps=30, 
-        codec='h264',
-        input_pix_fmt='rgb24', 
+        fps=30,
+        codec="h264",
+        input_pix_fmt="rgb24",
         crf=21,
-        thread_type='FRAME',
-        thread_count=3)
+        thread_type="FRAME",
+        thread_count=3,
+    )
 
-    with SharedMemoryManager() as shm_manager, \
-         Spacemouse(deadzone=0.4) as sm, \
-         XArm(xarm_config) as arm, \
-         MultiRealsense(shm_manager=shm_manager, record_fps=30, capture_fps=30, put_fps=30, put_downsample=True, video_recorder=video_recorder, verbose=True) as multi:
+    with SharedMemoryManager() as shm_manager, Spacemouse(deadzone=0.4) as sm, XArm(
+        xarm_config
+    ) as arm, MultiRealsense(
+        shm_manager=shm_manager,
+        record_fps=30,
+        capture_fps=30,
+        put_fps=30,
+        put_downsample=True,
+        video_recorder=video_recorder,
+        verbose=True,
+    ) as multi:
 
         print("MultiRealsense cameras started and ready.")
         multi.set_exposure(exposure=120, gain=0)
