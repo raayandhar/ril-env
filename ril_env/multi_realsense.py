@@ -2,13 +2,23 @@ import numbers
 import time
 import pathlib
 import numpy as np
-import pyrealsense2 as rs
+import logging
 
 from multiprocessing.managers import SharedMemoryManager
 from typing import List, Optional, Union, Dict, Callable
+
 from ril_env.realsense import SingleRealsense
 from ril_env.video_recorder import VideoRecorder
 
+logger = logging.getLogger(__name__)
+
+def repeat_to_list(x, n: int, cls):
+    if x is None:
+        x = [None] * n
+    if isinstance(x, cls):
+        x = [x] * n
+    assert len(x) == n, f"repeat_to_list got len(x)={len(x)}, expected {n}"
+    return x
 
 class MultiRealsense:
     def __init__(
@@ -27,29 +37,31 @@ class MultiRealsense:
         advanced_mode_config: Optional[Union[dict, List[dict]]] = None,
         transform: Optional[Union[Callable[[Dict], Dict], List[Callable]]] = None,
         vis_transform: Optional[Union[Callable[[Dict], Dict], List[Callable]]] = None,
-        recording_transform: Optional[
-            Union[Callable[[Dict], Dict], List[Callable]]
-        ] = None,
+        recording_transform: Optional[Union[Callable[[Dict], Dict], List[Callable]]] = None,
         video_recorder: Optional[Union[VideoRecorder, List[VideoRecorder]]] = None,
         verbose=False,
     ):
+        logger.info("Initializing MultiRealsense (no waits).")
+
         if shm_manager is None:
             shm_manager = SharedMemoryManager()
             shm_manager.start()
+
         if serial_numbers is None:
             serial_numbers = SingleRealsense.get_connected_devices_serial()
         n_cameras = len(serial_numbers)
+        logger.info(f"MultiRealsense found {n_cameras} cameras: {serial_numbers}")
 
         advanced_mode_config = repeat_to_list(advanced_mode_config, n_cameras, dict)
         transform = repeat_to_list(transform, n_cameras, Callable)
         vis_transform = repeat_to_list(vis_transform, n_cameras, Callable)
         recording_transform = repeat_to_list(recording_transform, n_cameras, Callable)
-
         video_recorder = repeat_to_list(video_recorder, n_cameras, VideoRecorder)
 
-        cameras = dict()
+        self.cameras = {}
         for i, serial in enumerate(serial_numbers):
-            cameras[serial] = SingleRealsense(
+            logger.info(f"Creating SingleRealsense {i} with serial={serial}")
+            self.cameras[serial] = SingleRealsense(
                 shm_manager=shm_manager,
                 serial_number=serial,
                 resolution=resolution,
@@ -68,9 +80,223 @@ class MultiRealsense:
                 video_recorder=video_recorder[i],
                 verbose=verbose,
             )
-
-        self.cameras = cameras
         self.shm_manager = shm_manager
+        logger.info("MultiRealsense init done (no waits).")
+
+    def __enter__(self):
+        self.start(wait=False)
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.stop(wait=False)
+
+    @property
+    def n_cameras(self):
+        return len(self.cameras)
+
+    @property
+    def is_ready(self):
+        """
+        No blocking. We might say we are 'ready' if all children set is_ready == True,
+        but we won't rely on it for blocking.
+        """
+        for cam in self.cameras.values():
+            if not cam.is_ready:
+                return False
+        return True
+
+    def start(self, wait=False, put_start_time=None):
+        """
+        Start all cameras with wait=False, so we don't block. 
+        This replicates your minimal script approach.
+        """
+        logger.info(f"MultiRealsense.start(wait={wait}), put_start_time={put_start_time}")
+        if put_start_time is None:
+            put_start_time = time.time()
+        for camera in self.cameras.values():
+            camera.start(wait=False, put_start_time=put_start_time)
+
+        # We do not wait. If wait was True, we could do a naive check, 
+        # but let's skip it to exactly match the minimal script logic.
+
+    def stop(self, wait=False):
+        logger.info(f"MultiRealsense.stop(wait={wait})")
+        for camera in self.cameras.values():
+            camera.stop(wait=False)
+        # We do not do a "stop_wait". We'll rely on the system to kill them eventually.
+
+    def get(self, k=None, out=None) -> Dict[int, Dict[str, np.ndarray]]:
+        """
+        Return a dictionary {i: {...}} of frames from each camera. 
+        Because there's no guarantee the camera is fully streaming, you might get fewer frames or older frames if not ready.
+        """
+        if out is None:
+            out = {}
+        i = 0
+        for serial, camera in self.cameras.items():
+            this_out = out.get(i, None)
+            this_out = camera.get(k=k, out=this_out)
+            out[i] = this_out
+            i += 1
+        return out
+
+    def get_vis(self, out=None):
+        """
+        Grab from the camera's vis ring buffer. 
+        Usually optional for a visual debug pipeline.
+        """
+        results = []
+        for i, camera in enumerate(self.cameras.values()):
+            this_out = None
+            if out is not None and i in out:
+                this_out = out[i]
+            this_out = camera.get_vis(out=this_out)
+            if out is None:
+                results.append(this_out)
+        if out is None and len(results) > 0:
+            # stack them
+            out = {}
+            for key in results[0].keys():
+                out[key] = np.stack([x[key] for x in results])
+        return out
+
+    def set_color_option(self, option, value):
+        logger.info(f"MultiRealsense.set_color_option({option}, {value})")
+        for camera in self.cameras.values():
+            camera.set_color_option(option, value)
+
+    def set_exposure(self, exposure=None, gain=None):
+        logger.info(f"MultiRealsense.set_exposure(exposure={exposure}, gain={gain})")
+        for camera in self.cameras.values():
+            camera.set_exposure(exposure=exposure, gain=gain)
+
+    def set_white_balance(self, white_balance=None):
+        logger.info(f"MultiRealsense.set_white_balance({white_balance})")
+        for camera in self.cameras.values():
+            camera.set_white_balance(white_balance)
+
+    def get_intrinsics(self):
+        return np.array([cam.get_intrinsics() for cam in self.cameras.values()])
+
+    def get_depth_scale(self):
+        return np.array([cam.get_depth_scale() for cam in self.cameras.values()])
+
+    def start_recording(self, video_path: Union[str, List[str]], start_time: float):
+        logger.info(f"MultiRealsense.start_recording({video_path}, start_time={start_time})")
+        if isinstance(video_path, str):
+            video_dir = pathlib.Path(video_path)
+            assert video_dir.parent.is_dir(), "Directory's parent not found"
+            video_dir.mkdir(parents=True, exist_ok=True)
+            new_paths = []
+            i = 0
+            for cam_serial in self.cameras:
+                new_paths.append(str(video_dir.joinpath(f"{i}.mp4").absolute()))
+                i += 1
+            video_path = new_paths
+
+        assert len(video_path) == len(self.cameras), \
+            f"Number of video paths {len(video_path)} != number of cameras {len(self.cameras)}"
+
+        i = 0
+        for cam_serial, camera in self.cameras.items():
+            camera.start_recording(video_path[i], start_time)
+            i += 1
+
+    def stop_recording(self):
+        logger.info("MultiRealsense.stop_recording()")
+        for camera in self.cameras.values():
+            camera.stop_recording()
+
+    def restart_put(self, start_time):
+        logger.info(f"MultiRealsense.restart_put(start_time={start_time})")
+        for camera in self.cameras.values():
+            camera.restart_put(start_time)
+
+"""
+import numbers
+import time
+import pathlib
+import numpy as np
+import logging
+
+from multiprocessing.managers import SharedMemoryManager
+from typing import List, Optional, Union, Dict, Callable
+
+from ril_env.realsense import SingleRealsense
+from ril_env.video_recorder import VideoRecorder
+
+logger = logging.getLogger(__name__)
+
+def repeat_to_list(x, n: int, cls):
+    if x is None:
+        x = [None] * n
+    if isinstance(x, cls):
+        x = [x] * n
+    assert len(x) == n, f"repeat_to_list got len(x)={len(x)}, expected {n}"
+    return x
+
+class MultiRealsense:
+    def __init__(
+        self,
+        serial_numbers: Optional[List[str]] = None,
+        shm_manager: Optional[SharedMemoryManager] = None,
+        resolution=(1280, 720),
+        capture_fps=30,
+        put_fps=None,
+        put_downsample=True,
+        record_fps=None,
+        enable_color=True,
+        enable_depth=False,
+        enable_infrared=False,
+        get_max_k=30,
+        advanced_mode_config: Optional[Union[dict, List[dict]]] = None,
+        transform: Optional[Union[Callable[[Dict], Dict], List[Callable]]] = None,
+        vis_transform: Optional[Union[Callable[[Dict], Dict], List[Callable]]] = None,
+        recording_transform: Optional[Union[Callable[[Dict], Dict], List[Callable]]] = None,
+        video_recorder: Optional[Union[VideoRecorder, List[VideoRecorder]]] = None,
+        verbose=False,
+    ):
+        logger.info("Initializing MultiRealsense...")
+
+        if shm_manager is None:
+            shm_manager = SharedMemoryManager()
+            shm_manager.start()
+
+        if serial_numbers is None:
+            serial_numbers = SingleRealsense.get_connected_devices_serial()
+        n_cameras = len(serial_numbers)
+        logger.info(f"MultiRealsense found {n_cameras} cameras: {serial_numbers}")
+
+        advanced_mode_config = repeat_to_list(advanced_mode_config, n_cameras, dict)
+        transform = repeat_to_list(transform, n_cameras, Callable)
+        vis_transform = repeat_to_list(vis_transform, n_cameras, Callable)
+        recording_transform = repeat_to_list(recording_transform, n_cameras, Callable)
+        video_recorder = repeat_to_list(video_recorder, n_cameras, VideoRecorder)
+
+        self.cameras = {}
+        for i, serial in enumerate(serial_numbers):
+            logger.info(f"Creating SingleRealsense {i} with serial={serial}")
+            self.cameras[serial] = SingleRealsense(
+                shm_manager=shm_manager,
+                serial_number=serial,
+                resolution=resolution,
+                capture_fps=capture_fps,
+                put_fps=put_fps,
+                put_downsample=put_downsample,
+                record_fps=record_fps,
+                enable_color=enable_color,
+                enable_depth=enable_depth,
+                enable_infrared=enable_infrared,
+                get_max_k=get_max_k,
+                advanced_mode_config=advanced_mode_config[i],
+                transform=transform[i],
+                vis_transform=vis_transform[i],
+                recording_transform=recording_transform[i],
+                video_recorder=video_recorder[i],
+                verbose=verbose,
+            )
+        self.shm_manager = shm_manager
+        logger.info("MultiRealsense init done.")
 
     def __enter__(self):
         self.start()
@@ -85,179 +311,119 @@ class MultiRealsense:
 
     @property
     def is_ready(self):
-        is_ready = True
+        # Must have all cameras ready
         for camera in self.cameras.values():
             if not camera.is_ready:
-                is_ready = False
-        return is_ready
+                return False
+        return True
 
     def start(self, wait=True, put_start_time=None):
+        logger.info(f"MultiRealsense.start(wait={wait}), put_start_time={put_start_time}")
         if put_start_time is None:
             put_start_time = time.time()
         for camera in self.cameras.values():
             camera.start(wait=False, put_start_time=put_start_time)
-
         if wait:
             self.start_wait()
 
     def stop(self, wait=True):
+        logger.info(f"MultiRealsense.stop(wait={wait})")
         for camera in self.cameras.values():
             camera.stop(wait=False)
-
         if wait:
             self.stop_wait()
 
     def start_wait(self):
+        logger.info("MultiRealsense.start_wait() => waiting for each camera.start_wait()")
         for camera in self.cameras.values():
             camera.start_wait()
 
     def stop_wait(self):
+        logger.info("MultiRealsense.stop_wait() => joining each camera.")
         for camera in self.cameras.values():
             camera.join()
 
     def get(self, k=None, out=None) -> Dict[int, Dict[str, np.ndarray]]:
-        """
-        Return order T,H,W,C
-        {
-            0: {
-                'rgb': (T,H,W,C),
-                'timestamp': (T,)
-            },
-            1: ...
-        }
-        """
         if out is None:
-            out = dict()
-        for i, camera in enumerate(self.cameras.values()):
-            this_out = None
-            if i in out:
-                this_out = out[i]
+            out = {}
+        i = 0
+        for serial, camera in self.cameras.items():
+            this_out = out.get(i, None)
             this_out = camera.get(k=k, out=this_out)
             out[i] = this_out
+            i += 1
         return out
 
     def get_vis(self, out=None):
-        results = list()
+
+        # This code is rarely used except for MultiCameraVisualizer
+        results = []
         for i, camera in enumerate(self.cameras.values()):
             this_out = None
-            if out is not None:
-                this_out = dict()
-                for key, v in out.items():
-                    # use the slicing trick to maintain the array
-                    # when v is 1D
-                    this_out[key] = v[i : i + 1].reshape(v.shape[1:])
+            if out is not None and i in out:
+                this_out = out[i]
             this_out = camera.get_vis(out=this_out)
             if out is None:
                 results.append(this_out)
-        if out is None:
-            out = dict()
+        if out is None and len(results) > 0:
+            # stack them
+            out = {}
             for key in results[0].keys():
                 out[key] = np.stack([x[key] for x in results])
         return out
 
     def set_color_option(self, option, value):
-        n_camera = len(self.cameras)
-        value = repeat_to_list(value, n_camera, numbers.Number)
-        for i, camera in enumerate(self.cameras.values()):
-            camera.set_color_option(option, value[i])
+        logger.info(f"MultiRealsense.set_color_option({option}, {value})")
+        for camera in self.cameras.values():
+            camera.set_color_option(option, value)
 
     def set_exposure(self, exposure=None, gain=None):
-        """
-        exposure: (1, 10000) 100us unit. (0.1 ms, 1/10000s)
-        gain: (0, 128)
-        """
-
-        if exposure is None and gain is None:
-            # auto exposure
-            self.set_color_option(rs.option.enable_auto_exposure, 1.0)
-        else:
-            # manual exposure
-            self.set_color_option(rs.option.enable_auto_exposure, 0.0)
-            if exposure is not None:
-                self.set_color_option(rs.option.exposure, exposure)
-            if gain is not None:
-                self.set_color_option(rs.option.gain, gain)
+        logger.info(f"MultiRealsense.set_exposure(exposure={exposure}, gain={gain})")
+        for camera in self.cameras.values():
+            camera.set_exposure(exposure=exposure, gain=gain)
 
     def set_white_balance(self, white_balance=None):
-        if white_balance is None:
-            self.set_color_option(rs.option.enable_auto_white_balance, 1.0)
-        else:
-            self.set_color_option(rs.option.enable_auto_white_balance, 0.0)
-            self.set_color_option(rs.option.white_balance, white_balance)
+        logger.info(f"MultiRealsense.set_white_balance({white_balance})")
+        for camera in self.cameras.values():
+            camera.set_white_balance(white_balance)
 
     def get_intrinsics(self):
-        return np.array([c.get_intrinsics() for c in self.cameras.values()])
+        return np.array([cam.get_intrinsics() for cam in self.cameras.values()])
 
     def get_depth_scale(self):
-        return np.array([c.get_depth_scale() for c in self.cameras.values()])
+        return np.array([cam.get_depth_scale() for cam in self.cameras.values()])
 
     def start_recording(self, video_path: Union[str, List[str]], start_time: float):
+        logger.info(f"MultiRealsense.start_recording({video_path}, start_time={start_time})")
+        # If user passed a single string, interpret it as a directory
         if isinstance(video_path, str):
-            # directory
             video_dir = pathlib.Path(video_path)
-            assert video_dir.parent.is_dir()
+            assert video_dir.parent.is_dir(), "Directory's parent not found"
             video_dir.mkdir(parents=True, exist_ok=True)
-            video_path = list()
-            for i in range(self.n_cameras):
-                video_path.append(str(video_dir.joinpath(f"{i}.mp4").absolute()))
-        assert len(video_path) == self.n_cameras
+            # We build a separate .mp4 for each camera
+            new_paths = []
+            i = 0
+            for cam_serial in self.cameras:
+                new_paths.append(str(video_dir.joinpath(f"{i}.mp4").absolute()))
+                i += 1
+            video_path = new_paths
 
-        for i, camera in enumerate(self.cameras.values()):
+        # Now we have a list of paths, one per camera
+        assert len(video_path) == len(self.cameras), \
+            f"Number of video paths {len(video_path)} != number of cameras {len(self.cameras)}"
+
+        i = 0
+        for cam_serial, camera in self.cameras.items():
             camera.start_recording(video_path[i], start_time)
+            i += 1
 
     def stop_recording(self):
-        for i, camera in enumerate(self.cameras.values()):
+        logger.info("MultiRealsense.stop_recording()")
+        for camera in self.cameras.values():
             camera.stop_recording()
 
     def restart_put(self, start_time):
+        logger.info(f"MultiRealsense.restart_put(start_time={start_time})")
         for camera in self.cameras.values():
             camera.restart_put(start_time)
-
-
-def repeat_to_list(x, n: int, cls):
-    if x is None:
-        x = [None] * n
-    if isinstance(x, cls):
-        x = [x] * n
-    assert len(x) == n
-    return x
-
-
-if __name__ == "__main__":
-
-    with SharedMemoryManager() as shm_manager:
-        serials = SingleRealsense.get_connected_devices_serial()
-        if not serials:
-            print("No RealSense devices found.")
-            exit(1)
-
-        print("Connected devices:", serials)
-
-        multi_camera = MultiRealsense(
-            serial_numbers=serials,
-            shm_manager=shm_manager,
-            resolution=(1280, 720),
-            capture_fps=30,
-            verbose=True,
-        )
-
-        multi_camera.start(wait=True)
-        print("Camera processes started and are ready.")
-
-        time.sleep(1)
-
-        video_dir = pathlib.Path("recordings")
-        video_dir.mkdir(parents=True, exist_ok=True)
-        print(f"Starting video recording to directory: {video_dir.absolute()}")
-
-        multi_camera.start_recording(str(video_dir), start_time=time.time())
-
-        time.sleep(5)
-
-        multi_camera.stop_recording()
-        print("Recording stopped.")
-
-        time.sleep(2)
-
-        multi_camera.stop(wait=True)
-        print("Camera processes terminated.")
+"""
