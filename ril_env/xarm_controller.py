@@ -1,6 +1,7 @@
 import numpy as np
 import time
 import logging
+import scipy.spatial.transform as st
 
 from xarm.wrapper import XArmAPI
 from dataclasses import dataclass, field
