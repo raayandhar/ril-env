@@ -2,10 +2,13 @@ import numpy as np
 import time
 import logging
 import scipy.spatial.transform as st
+import multiprocessing as mp
 
+from shared_memory.shared_memory_ring_buffer import SharedMemoryRingBuffer
 from xarm.wrapper import XArmAPI
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Dict, Union
+from numbers import Number
 
 logging.basicConfig(
     level=logging.INFO,
@@ -102,10 +105,10 @@ class XArm:
             logger.error(f"Error in set_gripper_speed: {code}")
             raise RuntimeError(f"Error in set_gripper_speed: {code}")
 
+        self.init = True
         time.sleep(3)
         self.home()
         time.sleep(3)
-        self.init = True
         logger.info("Successfully initialized xArm.")
 
     def shutdown(self):
@@ -211,10 +214,71 @@ class XArm:
         state["ActualQd"] = actual_joint_speeds
 
         return state
-        
+
     def __enter__(self):
         self.initialize()
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.shutdown()
+
+
+class XArmController(mp.Process):
+    def __init__(self, xarm: XArm, shm_manager, frequency=50, verbose=False):
+        super().__init__(name="XArmController")
+        self.xarm = xarm
+        self.frequency = frequency
+        self.verbose = verbose
+        self.stop_event = mp.Event()
+
+        example: Dict[str, Union[np.ndarray, Number]] = {
+            'TCPPose': np.zeros(6, dtype=np.float64),
+            'TCPSpeed': np.zeros(3, dtype=np.float64),
+            'JointAngles': np.zeros(6, dtype=np.float64),
+            'JointSpeeds': np.zeros(6, dtype=np.float64),
+            'timestamp': float(time.time()),
+        }
+
+        self.ring_buffer = SharedMemoryRingBuffer.create_from_examples(
+            shm_manager=shm_manager,
+            examples=example,
+            get_max_k=128,         # maximum number of stored samples
+            get_time_budget=0.2,     # time budget for retrieval (seconds)
+            put_desired_frequency=frequency  # desired put frequency
+        )
+
+    def run(self):
+        dt = 1.0 / self.frequency
+        if self.verbose:
+            logger.setLevel(logging.DEBUG)
+        logger.info(f"[XArmController] Starting data collection at {self.frequency} Hz.")
+        if not self.xarm.is_ready:
+            self.xarm.initialize()
+        try:
+            while not self.stop_event.is_set():
+                state = self.xarm.get_state()
+                data: Dict[str, Union[np.ndarray, Number]] = {
+                    'TCPPose': np.array(state.get("ActualTCPPose", np.zeros(6))),
+                    'TCPSpeed': np.array(state.get("ActualTCPSpeed", np.zeros(3))),
+                    'JointAngles': np.array(state.get("ActualQ", np.zeros(6))),
+                    'JointSpeeds': np.array(state.get("ActualQd", np.zeros(6))),
+                    'timestamp': float(time.time())
+                }
+                self.ring_buffer.put(data)
+                time.sleep(dt)
+        except Exception as e:
+            logger.error(f"[XArmController] Exception in run loop: {e}")
+        finally:
+            logger.info("[XArmController] Data collection stopped.")
+
+    def stop(self):
+        self.stop_event.set()
+
+    def step(self, dpos, drot, grasp):
+        self.xarm.step(dpos, drot, grasp)
+
+    def get_state(self, k=None):
+        if k is None:
+            return self.ring_buffer.get()
+        else:
+            return self.ring_buffer.get_last_k(k)
