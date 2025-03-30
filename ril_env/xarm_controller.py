@@ -1,6 +1,5 @@
 import numpy as np
 import time
-import scipy.spatial.transform as st
 import logging
 
 from xarm.wrapper import XArmAPI
@@ -37,6 +36,10 @@ class XArm:
 
         if self.config.verbose:
             logger.setLevel(logging.DEBUG)
+
+    @property
+    def is_ready(self):
+        return self.init
 
     def initialize(self):
         self.arm = XArmAPI(self.config.ip)
