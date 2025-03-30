@@ -101,10 +101,10 @@ class XArm:
             logger.error(f"Error in set_gripper_speed: {code}")
             raise RuntimeError(f"Error in set_gripper_speed: {code}")
 
-        self.init = True
         time.sleep(3)
         self.home()
         time.sleep(3)
+        self.init = True
         logger.info("Successfully initialized xArm.")
 
     def shutdown(self):
@@ -188,6 +188,29 @@ class XArm:
                     raise RuntimeError(f"Error in set_gripper_position (open): {code}")
             self.previous_grasp = grasp
 
+    def get_state(self):
+        state = {}
+
+        code, actual_pose = self.arm.get_position(is_radian=False)
+        if code != 0:
+            logger.error(f"Error getting TCP pose: code {code}")
+            raise RuntimeError(f"Error getting TCP pose: code {code}")
+        state["ActualTCPPose"] = actual_pose
+
+        actual_tcp_speed = self.arm.realtime_tcp_speed()
+        state["ActualTCPSpeed"] = actual_tcp_speed
+
+        code, actual_angles = self.arm.get_servo_angle(is_radian=False)
+        if code != 0:
+            logger.error(f"Error getting joint angles: code {code}")
+            raise RuntimeError(f"Error getting joint angles: code {code}")
+        state["ActualQ"] = actual_angles
+
+        actual_joint_speeds = self.arm.realtime_joint_speeds()
+        state["ActualQd"] = actual_joint_speeds
+
+        return state
+        
     def __enter__(self):
         self.initialize()
         return self
