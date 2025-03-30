@@ -175,8 +175,12 @@ class SingleRealsense(mp.Process):
     # ========= user API ===========
     def start(self, wait=True, put_start_time=None):
         self.put_start_time = put_start_time
+        print("start")
         super().start()
+        print("super() start finished")
+        print("wait: ", wait)
         if wait:
+            print("starting the wait")
             self.start_wait()
 
     def stop(self, wait=True):
@@ -185,6 +189,7 @@ class SingleRealsense(mp.Process):
             self.end_wait()
 
     def start_wait(self):
+        print("start_wait")
         self.ready_event.wait()
 
     def end_wait(self):
@@ -276,10 +281,12 @@ class SingleRealsense(mp.Process):
 
     # ========= interval API ===========
     def run(self):
+        print("HELLO!")
         # limit threads
         threadpool_limits(1)
-        cv2.setNumThreads(1)
-
+        print("HELLO?")
+        #cv2.setNumThreads(1)
+        print("HELLO2")
         w, h = self.resolution
         fps = self.capture_fps
         align = rs.align(rs.stream.color)
@@ -291,13 +298,14 @@ class SingleRealsense(mp.Process):
             rs_config.enable_stream(rs.stream.depth, w, h, rs.format.z16, fps)
         if self.enable_infrared:
             rs_config.enable_stream(rs.stream.infrared, w, h, rs.format.y8, fps)
-
         try:
             rs_config.enable_device(self.serial_number)
 
             # start pipeline
+            print("Trying")
             pipeline = rs.pipeline()
             pipeline_profile = pipeline.start(rs_config)
+            print("Passing")
 
             # report global time
             # https://github.com/IntelRealSense/librealsense/pull/3909
@@ -337,7 +345,9 @@ class SingleRealsense(mp.Process):
             t_start = time.time()
             while not self.stop_event.is_set():
                 # wait for frames to come in
+                print("wait for frames to come in")
                 frameset = pipeline.wait_for_frames()
+                print("we good!")
                 receive_time = time.time()
                 # align frames to color
                 frameset = align.process(frameset)

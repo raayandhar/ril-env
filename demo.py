@@ -3,7 +3,7 @@ import pathlib
 from multiprocessing.managers import SharedMemoryManager
 
 from ril_env.spacemouse import Spacemouse
-from ril_env.xarm import XArm, XArmConfig
+from ril_env.xarm_controller import XArm, XArmConfig
 from ril_env.multi_realsense import MultiRealsense
 from ril_env.video_recorder import VideoRecorder
 
