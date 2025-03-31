@@ -21,50 +21,52 @@ logger = logging.getLogger(__name__)
 # What does this do?
 DEFAULT_OBS_KEY_MAP = {
     # robot
-    'ActualTCPPose': 'robot_eef_pose',
-    'ActualTCPSpeed': 'robot_eef_pose_vel',
-    'ActualQ': 'robot_joint',
-    'ActualQd': 'robot_joint_vel',
+    "ActualTCPPose": "robot_eef_pose",
+    "ActualTCPSpeed": "robot_eef_pose_vel",
+    "ActualQ": "robot_joint",
+    "ActualQd": "robot_joint_vel",
     # timestamps
-    'step_idx': 'step_idx',
-    'timestamp': 'timestamp'
+    "step_idx": "step_idx",
+    "timestamp": "timestamp",
 }
 # Need to write a robot controller interface to pick up actions
 # from the ring buffer.
 # See: https://github.com/real-stanford/diffusion_policy/blob/5ba07ac6661db573af695b419a7947ecb704690f/diffusion_policy/real_world/rtde_interpolation_controller.py#L211
 
+
 class RealEnv:
-    def __init__(self,
-                 # Required?
-                 output_dir="./recordings/",
-                 # robot_ip,
-                 # Environment parameters
-                 frequency=30, # Robot control frequency
-                 num_obs_steps=2, # Used in the async env API
-                 # Observation parameters
-                 obs_image_resolution=(640, 480),
-                 max_obs_buffer_size=30,
-                 camera_serial_numbers=None,
-                 obs_key_map=DEFAULT_OBS_KEY_MAP, # REQUIRES CHANGING
-                 obs_float32=False,
-                 # Action - are these necessary / values make sense?
-                 max_pos_speed=0.25,
-                 max_rot_speed=0.6,
-                 # Robot - again, necessary / requires changing?
-                 tcp_offset=0.13, # ?? Not necessary for our robot code
-                 init_joints=False, # This should be homing
-                 # Video capture - see demo.py for what's needed?
-                 video_capture_fps=30,
-                 video_capture_resolution=(1280, 720),
-                 # Saving params
-                 record_raw_video=True,
-                 thread_per_video=3,
-                 video_crf=21,
-                 # Vis params
-                 enable_multi_cam_vis=False, # Not gonna work on this for now
-                 multi_cam_vis_resolution=(1280, 720),
-                 shm_manager=None,
-                ):
+    def __init__(
+        self,
+        # Required?
+        output_dir="./recordings/",
+        # robot_ip,
+        # Environment parameters
+        frequency=30,  # Robot control frequency
+        num_obs_steps=2,  # Used in the async env API
+        # Observation parameters
+        obs_image_resolution=(640, 480),
+        max_obs_buffer_size=30,
+        camera_serial_numbers=None,
+        obs_key_map=DEFAULT_OBS_KEY_MAP,  # REQUIRES CHANGING
+        obs_float32=False,
+        # Action - are these necessary / values make sense?
+        max_pos_speed=0.25,
+        max_rot_speed=0.6,
+        # Robot - again, necessary / requires changing?
+        tcp_offset=0.13,  # ?? Not necessary for our robot code
+        init_joints=False,  # This should be homing
+        # Video capture - see demo.py for what's needed?
+        video_capture_fps=30,
+        video_capture_resolution=(1280, 720),
+        # Saving params
+        record_raw_video=True,
+        thread_per_video=3,
+        video_crf=21,
+        # Vis params
+        enable_multi_cam_vis=False,  # Not gonna work on this for now
+        multi_cam_vis_resolution=(1280, 720),
+        shm_manager=None,
+    ):
 
         logger.info("Initializing environment.")
 
@@ -96,8 +98,10 @@ class RealEnv:
         )
         color_transform = color_tf
         if obs_float32:
+
             def float_transform(img):
                 return color_tf(img).astype(np.float32) / 255.0
+
             color_transform = float_transform
 
         def transform(data):
@@ -116,6 +120,7 @@ class RealEnv:
             output_res=(rw, rh),
             bgr_to_rgb=False,
         )
+
         def vis_transform(data):
             if "color" in data:
                 data["color"] = vis_color_transform(data["color"])
@@ -131,12 +136,12 @@ class RealEnv:
 
         # Video recorder
         video_recorder = VideoRecorder.create_h264(
-            fps = recording_fps,
+            fps=recording_fps,
             codec="h264",
             input_pix_fmt=recording_pix_fmt,
             crf=video_crf,
             thread_type="FRAME",
-            thread_count=thread_per_video # 3
+            thread_count=thread_per_video,  # 3
         )
 
         # Up to this point looks fine, video recorder is good
@@ -224,7 +229,7 @@ class RealEnv:
 
     def stop(self, wait=True):
         logger.info("RealEnv.stop() called (no wait).")
-        # self.end_episode()  
+        # self.end_episode()
         if self.multi_cam_vis is not None:
             self.multi_cam_vis.stop(wait=False)
         self.realsense.stop(wait=False)
@@ -239,6 +244,7 @@ class RealEnv:
     def __exit__(self, exc_type, exc_val, exc_tb):
         logger.info("Exiting RealEnv context manager (no wait).")
         self.stop(wait=False)
+
 
 def main():
     with RealEnv() as real_env:

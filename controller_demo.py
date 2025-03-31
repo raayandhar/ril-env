@@ -40,23 +40,23 @@ def main():
         thread_count=3,
     )
 
-    with SharedMemoryManager() as shm_manager, \
-         Spacemouse(deadzone=0.4) as sm, \
-         MultiRealsense(
-             shm_manager=shm_manager,
-             record_fps=30,
-             capture_fps=30,
-             put_fps=30,
-             put_downsample=True,
-             video_recorder=video_recorder,
-             verbose=True,
-         ) as multi:
+    with SharedMemoryManager() as shm_manager, Spacemouse(
+        deadzone=0.4
+    ) as sm, MultiRealsense(
+        shm_manager=shm_manager,
+        record_fps=30,
+        capture_fps=30,
+        put_fps=30,
+        put_downsample=True,
+        video_recorder=video_recorder,
+        verbose=True,
+    ) as multi:
 
         # 3) Create the XArmProcess in the main process
         xarm_proc = XArmProcess(
             config=xarm_config,
             shm_manager=shm_manager,
-            frequency=20.0,   # 20 Hz data capture
+            frequency=20.0,  # 20 Hz data capture
             buffer_size=256,  # ring buffer capacity
         )
 
@@ -72,7 +72,9 @@ def main():
 
         # Start recording
         multi.start_recording(str(video_dir), start_time=time.time())
-        logger.info(f"Recording started. Videos will be saved in {video_dir.absolute()}.")
+        logger.info(
+            f"Recording started. Videos will be saved in {video_dir.absolute()}."
+        )
 
         try:
             while True:

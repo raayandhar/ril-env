@@ -36,15 +36,35 @@ from ril_env.real_env import RealEnv
 
 
 @click.command()
-@click.option('--output', '-o', required=True, help="Directory to save demonstration dataset.")
-@click.option('--robot_ip', '-ri', required=True, help="xArm's IP address, e.g. 192.168.1.223")
-@click.option('--vis_camera_idx', default=0, type=int,
-              help="Which RealSense camera index to visualize in the OpenCV window.")
-@click.option('--init_joints', '-j', is_flag=True, default=False,
-              help="Whether to home the robot on startup.")
-@click.option('--frequency', '-f', default=10, type=float, help="Control frequency in Hz.")
-@click.option('--command_latency', '-cl', default=0.01, type=float,
-              help="Latency between receiving SpaceMouse command and sending it to the robot, in seconds.")
+@click.option(
+    "--output", "-o", required=True, help="Directory to save demonstration dataset."
+)
+@click.option(
+    "--robot_ip", "-ri", required=True, help="xArm's IP address, e.g. 192.168.1.223"
+)
+@click.option(
+    "--vis_camera_idx",
+    default=0,
+    type=int,
+    help="Which RealSense camera index to visualize in the OpenCV window.",
+)
+@click.option(
+    "--init_joints",
+    "-j",
+    is_flag=True,
+    default=False,
+    help="Whether to home the robot on startup.",
+)
+@click.option(
+    "--frequency", "-f", default=10, type=float, help="Control frequency in Hz."
+)
+@click.option(
+    "--command_latency",
+    "-cl",
+    default=0.01,
+    type=float,
+    help="Latency between receiving SpaceMouse command and sending it to the robot, in seconds.",
+)
 def main(output, robot_ip, vis_camera_idx, init_joints, frequency, command_latency):
     """
     An example teleoperation + recording script for a real xArm, controlled by a SpaceMouse.
@@ -55,22 +75,22 @@ def main(output, robot_ip, vis_camera_idx, init_joints, frequency, command_laten
 
     with SharedMemoryManager() as shm_manager:
         # Example "KeystrokeCounter" to gather pressed keys, e.g. 'c', 's', 'q', etc.
-        with KeystrokeCounter() as key_counter, \
-             Spacemouse(shm_manager=shm_manager) as sm, \
-             RealEnv(
-                output_dir=output,
-                robot_ip=robot_ip,
-                frequency=frequency,
-                init_joints=init_joints,
-                # For demonstration, let's record at raw resolution and enable the multi-cam visualizer
-                obs_image_resolution=(1280, 720),
-                video_capture_resolution=(1280, 720),
-                enable_multi_cam_vis=False,
-                record_raw_video=True,
-                thread_per_video=3,
-                video_crf=21,
-                shm_manager=shm_manager,
-             ) as env:
+        with KeystrokeCounter() as key_counter, Spacemouse(
+            shm_manager=shm_manager
+        ) as sm, RealEnv(
+            output_dir=output,
+            robot_ip=robot_ip,
+            frequency=frequency,
+            init_joints=init_joints,
+            # For demonstration, let's record at raw resolution and enable the multi-cam visualizer
+            obs_image_resolution=(1280, 720),
+            video_capture_resolution=(1280, 720),
+            enable_multi_cam_vis=False,
+            record_raw_video=True,
+            thread_per_video=3,
+            video_crf=21,
+            shm_manager=shm_manager,
+        ) as env:
             print("Here 75")
             # Optionally configure camera settings:
             env.realsense.set_exposure(exposure=120, gain=0)
@@ -79,7 +99,7 @@ def main(output, robot_ip, vis_camera_idx, init_joints, frequency, command_laten
             print("===== Ready! =====")
             # We'll pick an initial 'target_pose' from the current robot state.
             state = env.get_robot_state()
-            target_pose = np.array(state['eef_pose'], dtype=np.float32)
+            target_pose = np.array(state["eef_pose"], dtype=np.float32)
 
             t_start = time.monotonic()
             iter_idx = 0
@@ -103,30 +123,34 @@ def main(output, robot_ip, vis_camera_idx, init_joints, frequency, command_laten
                     # Check key presses
                     press_events = key_counter.get_press_events()
                     for key_stroke in press_events:
-                        if key_stroke == KeyCode(char='q'):
+                        if key_stroke == KeyCode(char="q"):
                             # Press 'Q' => exit the program
                             stop = True
-                        elif key_stroke == KeyCode(char='c'):
+                        elif key_stroke == KeyCode(char="c"):
                             # Press 'C' => start new episode recording
                             env.start_episode()
                             is_recording = True
                             print("[demo] Recording started!")
-                        elif key_stroke == KeyCode(char='s'):
+                        elif key_stroke == KeyCode(char="s"):
                             # Press 'S' => stop recording
                             env.end_episode()
                             is_recording = False
                             print("[demo] Recording stopped.")
                         elif key_stroke == Key.backspace:
                             # Press 'Backspace' => drop the last recorded episode
-                            if click.confirm("Drop the most recently recorded episode?"):
+                            if click.confirm(
+                                "Drop the most recently recorded episode?"
+                            ):
                                 env.drop_episode()
                                 is_recording = False
 
                     # If you'd like to store a discrete "stage" (like "1" while space is pressed):
-                    stage_val = key_counter[Key.space]  # e.g. 0 if not pressed, or 1 if pressed
+                    stage_val = key_counter[
+                        Key.space
+                    ]  # e.g. 0 if not pressed, or 1 if pressed
 
                     # Visualize the specified camera index.
-                    vis_img = obs[f'camera_{vis_camera_idx}'][-1, :, :, ::-1].copy()
+                    vis_img = obs[f"camera_{vis_camera_idx}"][-1, :, :, ::-1].copy()
 
                     # Text overlay
                     episode_id = env.replay_buffer.n_episodes
@@ -147,7 +171,9 @@ def main(output, robot_ip, vis_camera_idx, init_joints, frequency, command_laten
 
                     # Wait precisely until t_sample, then read the SpaceMouse
                     precise_wait(t_sample)
-                    sm_state = sm.get_motion_state_transformed()  # shape (6,) => [dx,dy,dz, rx,ry,rz]
+                    sm_state = (
+                        sm.get_motion_state_transformed()
+                    )  # shape (6,) => [dx,dy,dz, rx,ry,rz]
                     # Scale the commands based on robot max speeds:
                     dpos = sm_state[:3] * (env.max_pos_speed / frequency)
                     drot_xyz = sm_state[3:] * (env.max_rot_speed / frequency)
@@ -159,13 +185,15 @@ def main(output, robot_ip, vis_camera_idx, init_joints, frequency, command_laten
                         dpos[2] = 0
 
                     # Combine rotation with current target orientation:
-                    curr_rot = st.Rotation.from_euler('xyz', target_pose[3:], degrees=True)
-                    delta_rot = st.Rotation.from_euler('xyz', drot_xyz, degrees=True)
+                    curr_rot = st.Rotation.from_euler(
+                        "xyz", target_pose[3:], degrees=True
+                    )
+                    delta_rot = st.Rotation.from_euler("xyz", drot_xyz, degrees=True)
                     final_rot = delta_rot * curr_rot
 
                     # Update target_pose
                     target_pose[:3] += dpos
-                    target_pose[3:] = final_rot.as_euler('xyz', degrees=True)
+                    target_pose[3:] = final_rot.as_euler("xyz", degrees=True)
 
                     # Execute actions, including stage information:
                     env.exec_actions(
@@ -188,5 +216,6 @@ def main(output, robot_ip, vis_camera_idx, init_joints, frequency, command_laten
 
 if __name__ == "__main__":
     import multiprocessing
+
     multiprocessing.set_start_method("fork", force=True)
     main()

@@ -2532,7 +2532,8 @@ class BlocklyToolOld(object):
         if self._show_comment:
             self._append_to_file(
                 "{}# set line track position and ".format(
-                    prefix, )
+                    prefix,
+                )
             )
         self._append_to_file(
             "{}if arm.error_code == 0 and not params['quit']:".format(prefix)

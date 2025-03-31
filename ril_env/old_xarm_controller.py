@@ -29,7 +29,7 @@ class XArmConfig:
     home_speed: float = 50.0
     verbose: bool = False
 
-    
+
 # This code will be deprecated soon.
 class XArm:
     def __init__(self, xarm_config: XArmConfig):
@@ -234,9 +234,9 @@ class Command(enum.Enum):
 class XArmController(mp.Process):
     # Let's not pass in the config since dataclasses are really wacky
     def __init__(self, shm_manager, frequency=50, verbose=True):
-        super().__init__(name="XArmController") # Bypass GIL
+        super().__init__(name="XArmController")  # Bypass GIL
 
-        self.shm_manager = shm_manager # ???
+        self.shm_manager = shm_manager  # ???
         self.frequency = 50
         self.verbose = verbose
 
@@ -254,10 +254,10 @@ class XArmController(mp.Process):
         self.stop_event = mp.Event()
 
         queue_example = {
-            'cmd': Command.SERVOL.value,
-            'target_pose': np.zeros(6, dtype=np.float64),
-            'duration': 0.0,
-            'target_time': 0.0,
+            "cmd": Command.SERVOL.value,
+            "target_pose": np.zeros(6, dtype=np.float64),
+            "duration": 0.0,
+            "target_time": 0.0,
         }
         input_queue = SharedMemoryQueue.create_from_examples(
             shm_manager=shm_manager,
@@ -267,12 +267,12 @@ class XArmController(mp.Process):
 
         # Is this the correct data?
         ring_example = {
-            'TCPPose': np.zeros(6, dtype=np.float64),
-            'TCPSpeed': np.zeros(6, dtype=np.float64),
-            'JointAngles': np.zeros(7, dtype=np.float64),
-            'JointSpeeds': np.zeros(7, dtype=np.float64),
-            'GripperPosition': np.array([0.0], dtype=np.float64),
-            'timestamp': np.array([0.0], dtype=np.float64)
+            "TCPPose": np.zeros(6, dtype=np.float64),
+            "TCPSpeed": np.zeros(6, dtype=np.float64),
+            "JointAngles": np.zeros(7, dtype=np.float64),
+            "JointSpeeds": np.zeros(7, dtype=np.float64),
+            "GripperPosition": np.array([0.0], dtype=np.float64),
+            "timestamp": np.array([0.0], dtype=np.float64),
         }
 
         self.ring_buffer = SharedMemoryRingBuffer.create_from_examples(
@@ -283,7 +283,6 @@ class XArmController(mp.Process):
             put_desired_frequency=frequency,
         )
 
-        
 
 """
 class XArmController(mp.Process):
