@@ -11,6 +11,7 @@ from ril_env.video_recorder import VideoRecorder
 
 logger = logging.getLogger(__name__)
 
+
 def repeat_to_list(x, n: int, cls):
     if x is None:
         x = [None] * n
@@ -18,6 +19,7 @@ def repeat_to_list(x, n: int, cls):
         x = [x] * n
     assert len(x) == n, f"repeat_to_list got len(x)={len(x)}, expected {n}"
     return x
+
 
 class MultiRealsense:
     def __init__(
@@ -36,7 +38,9 @@ class MultiRealsense:
         advanced_mode_config: Optional[Union[dict, List[dict]]] = None,
         transform: Optional[Union[Callable[[Dict], Dict], List[Callable]]] = None,
         vis_transform: Optional[Union[Callable[[Dict], Dict], List[Callable]]] = None,
-        recording_transform: Optional[Union[Callable[[Dict], Dict], List[Callable]]] = None,
+        recording_transform: Optional[
+            Union[Callable[[Dict], Dict], List[Callable]]
+        ] = None,
         video_recorder: Optional[Union[VideoRecorder, List[VideoRecorder]]] = None,
         verbose=False,
     ):
@@ -102,7 +106,9 @@ class MultiRealsense:
         return True
 
     def start(self, wait=True, put_start_time=None):
-        logger.info(f"MultiRealsense.start(wait={wait}), put_start_time={put_start_time}")
+        logger.info(
+            f"MultiRealsense.start(wait={wait}), put_start_time={put_start_time}"
+        )
         if put_start_time is None:
             put_start_time = time.time()
         for camera in self.cameras.values():
@@ -118,7 +124,9 @@ class MultiRealsense:
             self.stop_wait()
 
     def start_wait(self):
-        logger.info("MultiRealsense.start_wait() => waiting for each camera.start_wait()")
+        logger.info(
+            "MultiRealsense.start_wait() => waiting for each camera.start_wait()"
+        )
         for camera in self.cameras.values():
             camera.start_wait()
 
@@ -178,7 +186,9 @@ class MultiRealsense:
         return np.array([cam.get_depth_scale() for cam in self.cameras.values()])
 
     def start_recording(self, video_path: Union[str, List[str]], start_time: float):
-        logger.info(f"MultiRealsense.start_recording({video_path}, start_time={start_time})")
+        logger.info(
+            f"MultiRealsense.start_recording({video_path}, start_time={start_time})"
+        )
         # If user passed a single string, interpret it as a directory
         if isinstance(video_path, str):
             video_dir = pathlib.Path(video_path)
@@ -193,8 +203,9 @@ class MultiRealsense:
             video_path = new_paths
 
         # Now we have a list of paths, one per camera
-        assert len(video_path) == len(self.cameras), \
-            f"Number of video paths {len(video_path)} != number of cameras {len(self.cameras)}"
+        assert len(video_path) == len(
+            self.cameras
+        ), f"Number of video paths {len(video_path)} != number of cameras {len(self.cameras)}"
 
         i = 0
         for cam_serial, camera in self.cameras.items():
@@ -210,4 +221,3 @@ class MultiRealsense:
         logger.info(f"MultiRealsense.restart_put(start_time={start_time})")
         for camera in self.cameras.values():
             camera.restart_put(start_time)
-

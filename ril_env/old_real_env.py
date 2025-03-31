@@ -28,6 +28,7 @@ DEFAULT_OBS_KEY_MAP = {
     "timestamp": "timestamp",
 }
 
+
 class RealEnv:
     """
     Simplified RealEnv that does not block/wait on realsense camera readiness.
@@ -89,8 +90,10 @@ class RealEnv:
         )
         color_transform = color_tf
         if obs_float32:
+
             def float_transform(img):
                 return color_tf(img).astype(np.float32) / 255.0
+
             color_transform = float_transform
 
         def transform(data):
@@ -109,6 +112,7 @@ class RealEnv:
             output_res=(rw, rh),
             bgr_to_rgb=False,
         )
+
         def vis_transform(data):
             if "color" in data:
                 data["color"] = vis_color_transform(data["color"])
@@ -198,7 +202,7 @@ class RealEnv:
         you can check realsense.is_ready, but we won't enforce it.
         The robot is considered init if self.robot.init is True.
         """
-        # We'll just return True if the robot is init. 
+        # We'll just return True if the robot is init.
         # Or we can also do `and self.realsense.is_ready` if you want to consider camera readiness.
         return self.robot.init
 
@@ -216,7 +220,7 @@ class RealEnv:
 
     def stop(self, wait=True):
         logger.info("RealEnv.stop() called (no wait).")
-        self.end_episode()  
+        self.end_episode()
         if self.multi_cam_vis is not None:
             self.multi_cam_vis.stop(wait=False)
         self.realsense.stop(wait=False)
@@ -234,8 +238,8 @@ class RealEnv:
 
     def get_obs(self) -> dict:
         """
-        We'll just try to pull the last n_obs_steps frames from realsense, 
-        plus the current xArm state. 
+        We'll just try to pull the last n_obs_steps frames from realsense,
+        plus the current xArm state.
         No blocking if cameras haven't started streaming yet.
         """
         # We don't check self.is_ready, because we don't want to block.
@@ -278,7 +282,7 @@ class RealEnv:
 
     def exec_actions(self, actions: np.ndarray, timestamps: np.ndarray):
         """
-        Just apply the first action immediately. 
+        Just apply the first action immediately.
         No blocking or advanced scheduling.
         """
         if not isinstance(actions, np.ndarray):
@@ -304,7 +308,7 @@ class RealEnv:
 
     def start_episode(self, start_time=None):
         """
-        Start a new demonstration episode: 
+        Start a new demonstration episode:
         re-initialize accumulators, start camera recording, etc.
         """
         if start_time is None:
@@ -333,7 +337,9 @@ class RealEnv:
         self.stage_accumulator = TimestampActionAccumulator(
             start_time=start_time, dt=1 / self.frequency
         )
-        logger.info(f"Episode {episode_id} started with no camera waits at t={start_time:.3f}")
+        logger.info(
+            f"Episode {episode_id} started with no camera waits at t={start_time:.3f}"
+        )
 
     def end_episode(self):
         self.realsense.stop_recording()
@@ -364,7 +370,7 @@ class RealEnv:
 
     def drop_episode(self):
         """
-        Stop any current episode, then drop from the replay buffer 
+        Stop any current episode, then drop from the replay buffer
         and remove the last video directory.
         """
         self.end_episode()
@@ -374,6 +380,7 @@ class RealEnv:
         if ep_dir.exists():
             shutil.rmtree(str(ep_dir))
         logger.info(f"Episode {ep_id} dropped (no wait).")
+
 
 """
 import pathlib

@@ -3,15 +3,14 @@ import scipy.spatial.transform as st
 
 from multiprocessing.managers import SharedMemoryManager
 from ril_env.spacemouse import Spacemouse
-from ril_env.xarm_controller import XArmController, Command
+from ril_env.xarm_controller import XArmController, Command, XArmConfig
+
 
 def main():
     with SharedMemoryManager() as shm_manager, Spacemouse(deadzone=0.4) as sm:
+        xarm_config = XArmConfig()
         xarm_ctrl = XArmController(
-            shm_manager=shm_manager,
-            ip="192.168.1.223",
-            frequency=50,
-            verbose=True
+            shm_manager=shm_manager, xarm_config=xarm_config,
         )
         xarm_ctrl.start(wait=True)
         print("XArmController started and ready.")
@@ -23,7 +22,7 @@ def main():
         try:
             while True:
                 loop_start = time.monotonic()
-                
+
                 # Get spacemouse 6D motion.
                 sm_state = sm.get_motion_state_transformed()
                 dpos = sm_state[:3]
@@ -34,24 +33,26 @@ def main():
                 dpos *= xarm_ctrl.position_gain
                 drot *= xarm_ctrl.orientation_gain
 
-                curr_rot = st.Rotation.from_euler("xyz", xarm_ctrl.current_orientation, degrees=True)
+                curr_rot = st.Rotation.from_euler(
+                    "xyz", xarm_ctrl.current_orientation, degrees=True
+                )
                 delta_rot = st.Rotation.from_euler("xyz", drot, degrees=True)
                 final_rot = delta_rot * curr_rot
 
                 current_target_pose[:3] += dpos
                 current_target_pose[3:] = final_rot.as_euler("xyz", degrees=True)
-                
+
                 # Update target pose (with scaling if needed).
                 # current_target_pose[:3] += dpos
                 # current_target_pose[3:] += drot
                 # Need to test this
                 # Create and send a STEP command.
                 command = {
-                    'cmd': Command.STEP.value,
-                    'target_pose': current_target_pose,
-                    'grasp': grasp,
-                    'duration': 0.02,
-                    'target_time': time.time() + 0.02
+                    "cmd": Command.STEP.value,
+                    "target_pose": current_target_pose,
+                    "grasp": grasp,
+                    "duration": 0.02,
+                    "target_time": time.time() + 0.02,
                 }
                 """
                 command = {
@@ -67,7 +68,7 @@ def main():
 
                 # Fetch the latest state from the ring buffer.
                 state = xarm_ctrl.get_state()
-                ts = state.get('robot_receive_timestamp')
+                ts = state.get("robot_receive_timestamp")
                 # Check if the timestamp has updated.
                 if ts != last_timestamp:
                     print(f"Ring buffer updated, timestamp: {ts:.3f}")
@@ -81,6 +82,7 @@ def main():
         finally:
             xarm_ctrl.stop(wait=True)
             print("XArmController stopped.")
+
 
 if __name__ == "__main__":
     main()

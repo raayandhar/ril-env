@@ -283,7 +283,7 @@ class SingleRealsense(mp.Process):
         # limit threads
         threadpool_limits(1)
         print("HELLO?")
-        #cv2.setNumThreads(1)
+        # cv2.setNumThreads(1)
         print("HELLO2")
         w, h = self.resolution
         fps = self.capture_fps
