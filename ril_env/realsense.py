@@ -2,9 +2,7 @@ import enum
 import time
 import json
 import numpy as np
-import pyrealsense2
 import multiprocessing as mp
-import cv2
 import pyrealsense2 as rs
 
 from threadpoolctl import threadpool_limits

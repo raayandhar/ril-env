@@ -178,7 +178,7 @@ def main(output, robot_ip, vis_camera_idx, init_joints, frequency, command_laten
                     precise_wait(t_cycle_end)
                     iter_idx += 1
 
-            except Exception as e:
+            except Exception:
                 print("Exception occurred during the main loop:")
                 traceback.print_exc()
             finally:

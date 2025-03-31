@@ -1,17 +1,13 @@
-import torch
 import cv2
-import os
 import numpy as np
 
 from multicam import XarmEnv
 
-from scipy.spatial.transform import Rotation as R
 from rs_streamer import RealsenseStreamer
 from calib_utils.linalg_utils import transform
 
 # from pynput import keyboard
 
-import argparse
 
 
 GRIPPER_SPEED, GRIPPER_FORCE, GRIPPER_MAX_WIDTH, GRIPPER_TOLERANCE = (

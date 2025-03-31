@@ -1,0 +1,349 @@
+import numpy as np
+import time
+import logging
+import scipy.spatial.transform as st
+import multiprocessing as mp
+import enum
+
+from shared_memory.shared_memory_ring_buffer import SharedMemoryRingBuffer
+from shared_memory.shared_memory_queue import SharedMemoryQueue
+from multiprocessing.managers import SharedMemoryManager
+from xarm.wrapper import XArmAPI
+from dataclasses import dataclass, field
+from typing import List
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class XArmConfig:
+    ip: str = "192.168.1.223"
+    tcp_maxacc: int = 5000
+    position_gain: float = 2.0
+    orientation_gain: float = 2.0
+    home_pos: List[int] = field(default_factory=lambda: [0, 0, 0, 70, 0, 70, 0])
+    home_speed: float = 50.0
+    verbose: bool = False
+
+    
+# This code will be deprecated soon.
+class XArm:
+    def __init__(self, xarm_config: XArmConfig):
+        self.config = xarm_config
+        self.init = False
+
+        self.current_position = None
+        self.current_orientation = None
+        self.previous_grasp = 0.0
+
+        if self.config.verbose:
+            logger.setLevel(logging.DEBUG)
+
+    @property
+    def is_ready(self):
+        return self.init
+
+    def initialize(self):
+        self.arm = XArmAPI(self.config.ip)
+        arm = self.arm
+
+        arm.connect()
+        arm.clean_error()
+        arm.clean_warn()
+
+        code = arm.motion_enable(enable=True)
+        if code != 0:
+            logger.error(f"Error in motion_enable: {code}")
+            raise RuntimeError(f"Error in motion_enable: {code}")
+
+        arm.set_tcp_maxacc(self.config.tcp_maxacc)
+
+        code = arm.set_mode(1)
+        if code != 0:
+            logger.error(f"Error in set_mode: {code}")
+            raise RuntimeError(f"Error in set_mode: {code}")
+
+        code = arm.set_state(0)
+        if code != 0:
+            logger.error(f"Error in set_state: {code}")
+            raise RuntimeError(f"Error in set_state: {code}")
+
+        code, state = arm.get_state()
+        if code != 0:
+            logger.error(f"Error getting robot state: {code}")
+            raise RuntimeError(f"Error getting robot state: {code}")
+        if state != 0:
+            logger.error(f"Robot is not ready to move. Current state: {state}")
+            raise RuntimeError(f"Robot is not ready to move. Current state: {state}")
+        else:
+            logger.info(f"Robot is ready to move. Current state: {state}")
+
+        err_code, warn_code = arm.get_err_warn_code()
+        if err_code != 0 or warn_code != 0:
+            logger.error(
+                f"Error code: {err_code}, Warning code: {warn_code}. Cleaning error and warning."
+            )
+            arm.clean_error()
+            arm.clean_warn()
+            arm.motion_enable(enable=True)
+            arm.set_state(0)
+
+        code = arm.set_gripper_mode(0)
+        if code != 0:
+            logger.error(f"Error in set_gripper_mode: {code}")
+            raise RuntimeError(f"Error in set_gripper_mode: {code}")
+
+        code = arm.set_gripper_enable(True)
+        if code != 0:
+            logger.error(f"Error in set_gripper_enable: {code}")
+            raise RuntimeError(f"Error in set_gripper_enable: {code}")
+
+        code = arm.set_gripper_speed(1000)
+        if code != 0:
+            logger.error(f"Error in set_gripper_speed: {code}")
+            raise RuntimeError(f"Error in set_gripper_speed: {code}")
+
+        self.init = True
+        time.sleep(3)
+        self.home()
+        time.sleep(3)
+        logger.info("Successfully initialized xArm.")
+
+    def shutdown(self):
+        if not self.init:
+            logger.error("shutdown() called on an uninitialized xArm.")
+            return
+        self.home()
+        self.arm.disconnect()
+        logger.info("xArm shutdown complete.")
+
+    def home(self):
+        logger.info("Homing robot.")
+        if not self.init:
+            logger.error("xArm not initialized.")
+            raise RuntimeError("xArm not initialized.")
+
+        arm = self.arm
+        arm.set_mode(0)
+        arm.set_state(0)
+        code = arm.set_gripper_position(850, wait=False)
+        if code != 0:
+            logger.error(f"Error in set_gripper_position (open, homing): {code}")
+            raise RuntimeError(f"Error in set_gripper_position (open, homing): {code}")
+
+        code = arm.set_servo_angle(
+            angle=self.config.home_pos, speed=self.config.home_speed, wait=True
+        )
+        if code != 0:
+            logger.error(f"Error in set_servo_angle (homing): {code}")
+            raise RuntimeError(f"Error in set_servo_angle (homing): {code}")
+        arm.set_mode(1)
+        arm.set_state(0)
+
+        code, pose = arm.get_position()
+        if code != 0:
+            logger.error(f"Failed to query initial pose: {code}")
+            raise RuntimeError(f"Failed to query initial pose: {code}")
+        else:
+            self.current_position = np.array(pose[:3])
+            self.current_orientation = np.array(pose[3:])
+            logger.debug(
+                f"Initial pose set: pos={self.current_position}, ori={self.current_orientation}"
+            )
+
+    def step(self, dpos, drot, grasp):
+        if not self.init:
+            logger.error("xArm not initialized. Use it in a 'with' block")
+            raise RuntimeError("xArm not initialized. Use it in a 'with' block")
+
+        dpos *= self.config.position_gain
+        drot *= self.config.orientation_gain
+
+        curr_rot = st.Rotation.from_euler("xyz", self.current_orientation, degrees=True)
+        delta_rot = st.Rotation.from_euler("xyz", drot, degrees=True)
+        final_rot = delta_rot * curr_rot
+
+        self.current_orientation = final_rot.as_euler("xyz", degrees=True)
+        self.current_position += dpos
+
+        logger.debug(f"Current position: {self.current_position}")
+        logger.debug(f"Current orientation: {self.current_orientation}")
+
+        code = self.arm.set_servo_cartesian(
+            np.concatenate((self.current_position, self.current_orientation)),
+            is_radian=False,
+        )
+        if code != 0:
+            logger.error(f"Error in set_servo_cartesian in step(): {code}")
+            raise RuntimeError(f"Error in set_servo_cartesian in step(): {code}")
+
+        if grasp != self.previous_grasp:
+            if grasp == 1.0:
+                code = self.arm.set_gripper_position(0, wait=False)
+                if code != 0:
+                    logger.error(f"Error in set_gripper_position (close): {code}")
+                    raise RuntimeError(f"Error in set_gripper_position (close): {code}")
+            else:
+                code = self.arm.set_gripper_position(850, wait=False)
+                if code != 0:
+                    logger.error(f"Error in set_gripper_position (open): {code}")
+                    raise RuntimeError(f"Error in set_gripper_position (open): {code}")
+            self.previous_grasp = grasp
+
+    def get_state(self):
+        state = {}
+
+        code, actual_pose = self.arm.get_position(is_radian=False)
+        if code != 0:
+            logger.error(f"Error getting TCP pose: code {code}")
+            raise RuntimeError(f"Error getting TCP pose: code {code}")
+        state["ActualTCPPose"] = actual_pose
+
+        actual_tcp_speed = self.arm.realtime_tcp_speed()
+        state["ActualTCPSpeed"] = actual_tcp_speed
+
+        code, actual_angles = self.arm.get_servo_angle(is_radian=False)
+        if code != 0:
+            logger.error(f"Error getting joint angles: code {code}")
+            raise RuntimeError(f"Error getting joint angles: code {code}")
+        state["ActualQ"] = actual_angles
+
+        actual_joint_speeds = self.arm.realtime_joint_speeds()
+        state["ActualQd"] = actual_joint_speeds
+
+        return state
+
+    def __enter__(self):
+        self.initialize()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.shutdown()
+
+
+class Command(enum.Enum):
+    STOP = 0
+    SERVOL = 1
+    SCHEDULE_WAYPOINT = 2
+
+
+class XArmController(mp.Process):
+    # Let's not pass in the config since dataclasses are really wacky
+    def __init__(self, shm_manager, frequency=50, verbose=True):
+        super().__init__(name="XArmController") # Bypass GIL
+
+        self.shm_manager = shm_manager # ???
+        self.frequency = 50
+        self.verbose = verbose
+
+        if self.verbose:
+            logger.setLevel(logging.DEBUG)
+
+        # Now some constants - just copied over from config
+        self.ip: str = "192.168.1.223"
+        self.position_gain: float = 2.0
+        self.orientation_gain: float = 2.0
+        self.home_pos: List[int] = [0, 0, 0, 70, 0, 70, 0]
+        self.home_speed: float = 50.0
+
+        self.ready_event = mp.Event()
+        self.stop_event = mp.Event()
+
+        queue_example = {
+            'cmd': Command.SERVOL.value,
+            'target_pose': np.zeros(6, dtype=np.float64),
+            'duration': 0.0,
+            'target_time': 0.0,
+        }
+        input_queue = SharedMemoryQueue.create_from_examples(
+            shm_manager=shm_manager,
+            examples=queue_example,
+            buffer_size=256,
+        )
+
+        # Is this the correct data?
+        ring_example = {
+            'TCPPose': np.zeros(6, dtype=np.float64),
+            'TCPSpeed': np.zeros(6, dtype=np.float64),
+            'JointAngles': np.zeros(7, dtype=np.float64),
+            'JointSpeeds': np.zeros(7, dtype=np.float64),
+            'GripperPosition': np.array([0.0], dtype=np.float64),
+            'timestamp': np.array([0.0], dtype=np.float64)
+        }
+
+        self.ring_buffer = SharedMemoryRingBuffer.create_from_examples(
+            shm_manager=shm_manager,
+            examples=ring_example,
+            get_max_k=128,
+            get_time_budget=0.2,
+            put_desired_frequency=frequency,
+        )
+
+        
+
+"""
+class XArmController(mp.Process):
+    def __init__(self, xarm: XArm, shm_manager, frequency=50, verbose=False):
+        super().__init__(name="XArmController")
+        self.xarm = xarm
+        self.frequency = frequency
+        self.verbose = verbose
+        self.stop_event = mp.Event()
+
+        example: Dict[str, Union[np.ndarray, Number]] = {
+            'TCPPose': np.zeros(6, dtype=np.float64),
+            'TCPSpeed': np.zeros(3, dtype=np.float64),
+            'JointAngles': np.zeros(6, dtype=np.float64),
+            'JointSpeeds': np.zeros(6, dtype=np.float64),
+            'timestamp': float(time.time()),
+        }
+
+        self.ring_buffer = SharedMemoryRingBuffer.create_from_examples(
+            shm_manager=shm_manager,
+            examples=example,
+            get_max_k=128,         # maximum number of stored samples
+            get_time_budget=0.2,     # time budget for retrieval (seconds)
+            put_desired_frequency=frequency  # desired put frequency
+        )
+
+    def run(self):
+        dt = 1.0 / self.frequency
+        if self.verbose:
+            logger.setLevel(logging.DEBUG)
+        logger.info(f"[XArmController] Starting data collection at {self.frequency} Hz.")
+        if not self.xarm.is_ready:
+            self.xarm.initialize()
+        try:
+            while not self.stop_event.is_set():
+                state = self.xarm.get_state()
+                data: Dict[str, Union[np.ndarray, Number]] = {
+                    'TCPPose': np.array(state.get("ActualTCPPose", np.zeros(6))),
+                    'TCPSpeed': np.array(state.get("ActualTCPSpeed", np.zeros(3))),
+                    'JointAngles': np.array(state.get("ActualQ", np.zeros(6))),
+                    'JointSpeeds': np.array(state.get("ActualQd", np.zeros(6))),
+                    'timestamp': float(time.time())
+                }
+                self.ring_buffer.put(data)
+                time.sleep(dt)
+        except Exception as e:
+            logger.error(f"[XArmController] Exception in run loop: {e}")
+        finally:
+            logger.info("[XArmController] Data collection stopped.")
+
+    def stop(self):
+        self.stop_event.set()
+
+    def step(self, dpos, drot, grasp):
+        self.xarm.step(dpos, drot, grasp)
+
+    def get_state(self, k=None):
+        if k is None:
+            return self.ring_buffer.get()
+        else:
+            return self.ring_buffer.get_last_k(k)
+"""

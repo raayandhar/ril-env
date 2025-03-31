@@ -4,7 +4,6 @@
 
 import math
 import time
-from ..core.utils.log import logger
 from .base import Base
 from .decorator import xarm_is_connected
 

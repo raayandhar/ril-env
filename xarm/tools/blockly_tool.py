@@ -11,10 +11,8 @@ try:
 except ImportError:
     import xml.etree.ElementTree as ET
 import re
-import sys
 import json
 import time
-import random
 from .blockly._blockly_highlight import HIGHLIGHT_BLOCKS
 from .blockly import BlocklyTool
 
@@ -86,7 +84,7 @@ class BlocklyToolOld(object):
                 ns = r.search(self.root.tag).group(1)
             else:
                 ns = ""
-        except Exception as e:
+        except Exception:
             # print(e)
             ns = ""
         return ns
@@ -2534,8 +2532,7 @@ class BlocklyToolOld(object):
         if self._show_comment:
             self._append_to_file(
                 "{}# set line track position and ".format(
-                    prefix, "wait" if wait else "no wait"
-                )
+                    prefix, )
             )
         self._append_to_file(
             "{}if arm.error_code == 0 and not params['quit']:".format(prefix)
