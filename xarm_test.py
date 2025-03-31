@@ -1,4 +1,6 @@
 import time
+import scipy.spatial.transform as st
+
 from multiprocessing.managers import SharedMemoryManager
 from ril_env.spacemouse import Spacemouse
 from ril_env.xarm_controller import XArmController, Command
@@ -26,18 +28,41 @@ def main():
                 sm_state = sm.get_motion_state_transformed()
                 dpos = sm_state[:3]
                 drot = sm_state[3:]
+                grasp = sm.grasp
+
+                # Replicating .step() here
+                dpos *= xarm_ctrl.position_gain
+                drot *= xarm_ctrl.orientation_gain
+
+                curr_rot = st.Rotation.from_euler("xyz", xarm_ctrl.current_orientation, degrees=True)
+                delta_rot = st.Rotation.from_euler("xyz", drot, degrees=True)
+                final_rot = delta_rot * curr_rot
+
+                current_target_pose[:3] += dpos
+                current_target_pose[3:] = final_rot.as_euler("xyz", degrees=True)
                 
                 # Update target pose (with scaling if needed).
-                current_target_pose[:3] += dpos
-                current_target_pose[3:] += drot
-
-                # Create and send a SERVOL command.
+                # current_target_pose[:3] += dpos
+                # current_target_pose[3:] += drot
+                # Need to test this
+                # Create and send a STEP command.
                 command = {
-                    'cmd': Command.SERVOL.value,
+                    'cmd': Command.STEP.value,
                     'target_pose': current_target_pose,
+                    'grasp': grasp,
                     'duration': 0.02,
                     'target_time': time.time() + 0.02
                 }
+                """
+                command = {
+                    'cmd': Command.STEP.value,
+                    'dpos': dpos,
+                    'drot': drot,
+                    'grasp': grasp,
+                    'duration': 0.02,
+                    'target_time': time.time() + 0.02,
+                }
+                """
                 xarm_ctrl.input_queue.put(command)
 
                 # Fetch the latest state from the ring buffer.

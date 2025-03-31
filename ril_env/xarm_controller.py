@@ -1,12 +1,12 @@
-import os
 import time
 import enum
 import multiprocessing as mp
 import numpy as np
+import scipy.spatial.transform as st
 import logging
 
-from xarm.wrapper import XArmAPI
 from typing import List
+from xarm.wrapper import XArmAPI
 from multiprocessing.managers import SharedMemoryManager
 from shared_memory.shared_memory_queue import SharedMemoryQueue, Empty
 from shared_memory.shared_memory_ring_buffer import SharedMemoryRingBuffer
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 # Command enum matching RTDE's style
 class Command(enum.Enum):
     STOP = 0
-    SERVOL = 1
+    STEP = 1
     SCHEDULE_WAYPOINT = 2 # Not used.
 
 class XArmController(mp.Process):
@@ -35,6 +35,7 @@ class XArmController(mp.Process):
         self.shm_manager = shm_manager
         self.frequency = frequency
         self.verbose = verbose
+        # self.init = False
 
         # Constants copied over from the config
         self.ip: str = "192.168.1.223"
@@ -52,8 +53,10 @@ class XArmController(mp.Process):
 
         # Build Input Queue
         queue_example = {
-            'cmd': Command.SERVOL.value,
+            'cmd': Command.STEP.value,
             'target_pose': np.zeros(6, dtype=np.float64),  # [x, y, z, roll, pitch, yaw]
+            # 'drot': np.zeros(6, dtype=np.float64),  # [roll, pitch, yaw]
+            'grasp': 0.0,
             'duration': 0.0,
             'target_time': 0.0
         }
@@ -63,7 +66,11 @@ class XArmController(mp.Process):
             buffer_size=256
         )
 
-        #  Build Ring Buffer
+        # self.current_position = None
+        # self.current_orientation = None
+        self.previous_grasp = 0.0
+
+        # Build Ring Buffer
         # We first connect temporarily to the xArm to obtain initial state.
         try:
             arm_temp = XArmAPI(self.ip)
@@ -118,8 +125,11 @@ class XArmController(mp.Process):
             except Exception:
                 state_example['JointSpeeds'] = np.zeros(7, dtype=np.float64)
 
-            # Include a robot timestamp similar to the RTDE controller (absolute for now).
+            # Include a robot timestamp similar to RTDE controller (absolute for now).
             state_example['robot_receive_timestamp'] = time.time()
+
+            # Grasp, not tested.
+            state_example['Grasp'] = self.previous_grasp
 
             self.ring_buffer = SharedMemoryRingBuffer.create_from_examples(
                 shm_manager=shm_manager,
@@ -160,6 +170,18 @@ class XArmController(mp.Process):
             return self.ring_buffer.get()
         else:
             return self.ring_buffer.get_last_k(k)
+
+    def step(self, arm, dpos, drot, grasp):
+        """
+        if not self.init:
+            logger.error("[XArmController] Called .step() while not in run()")
+            raise RuntimeError("[XArmController] Called .step() while not in run()")
+        """
+
+        dpos *= self.position_gain
+        drot *= self.orientation_gain
+
+        # Ignore this method, move things in the demo code
 
     def run(self):
         """
@@ -224,9 +246,12 @@ class XArmController(mp.Process):
                         logger.debug("[XArmController] Received STOP command.")
                         self.stop_event.set()
                         break
-                    elif cmd == Command.SERVOL.value:
+                    elif cmd == Command.STEP.value:
                         # Directly update the target pose.
+                        # Do this instead of step?
+                        # Need to record grasp state, and be able to send grasp cmd.
                         target_pose = np.array(command['target_pose'], dtype=np.float64)
+                        grasp = command['grasp']
                         self.last_target_pose = target_pose
                         if self.verbose:
                             logger.debug(f"[XArmController] New target pose: {target_pose}")
@@ -235,10 +260,23 @@ class XArmController(mp.Process):
 
                 # Command the robot via set_servo_cartesian using the latest target pose.
                 code = arm.set_servo_cartesian(list(self.last_target_pose), is_radian=False)
+                if grasp != self.previous_grasp:
+                    if grasp == 1.0:
+                        code = self.arm.set_gripper_position(0, wait=False)
+                        if code != 0:
+                            logger.error(f"Error in set_gripper_position (close): {code}")
+                            raise RuntimeError(f"Error in set_gripper_position (close): {code}")
+                    else:
+                        code = self.arm.set_gripper_position(850, wait=False)
+                        if code != 0:
+                            logger.error(f"Error in set_gripper_position (open): {code}")
+                            raise RuntimeError(f"Error in set_gripper_position (open): {code}")
+                    self.previous_grasp = grasp
+
                 if code != 0:
                     logger.error(f"[XArmController] set_servo_cartesian error: {code}")
 
-                # --- Update Robot State ---
+                # Update Robot State
                 state = {}
                 # Fetch TCPPose using get_position
                 code, pos = arm.get_position(is_radian=False)
@@ -275,6 +313,17 @@ class XArmController(mp.Process):
                 except Exception as e:
                     logger.error(f"Error in realtime_joint_speeds: {e}")
                     state['JointSpeeds'] = np.zeros(7, dtype=np.float64)
+
+                # Fetch Grasp, callable/attribute
+                try:
+                    if callable(arm.get_gripper_position):
+                        gripper_pos = arm.get_gripper_position()
+                    else:
+                        gripper_pos = arm.get_gripper_position
+                    state['Grasp'] = gripper_pos
+                except Exception as e:
+                    logger.error(f"Error in get_gripper_position: {e}")
+                    state['Grasp'] = 0.0
 
                 # Add a robot timestamp as elapsed time since start.
                 state['robot_receive_timestamp'] = time.time() - start_time
