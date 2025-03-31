@@ -7,7 +7,6 @@ import enum
 
 from shared_memory.shared_memory_ring_buffer import SharedMemoryRingBuffer
 from shared_memory.shared_memory_queue import SharedMemoryQueue
-from multiprocessing.managers import SharedMemoryManager
 from xarm.wrapper import XArmAPI
 from dataclasses import dataclass, field
 from typing import List

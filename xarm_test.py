@@ -47,7 +47,7 @@ def main():
                 if ts != last_timestamp:
                     print(f"Ring buffer updated, timestamp: {ts:.3f}")
                     last_timestamp = ts
-
+                # TODO: Check and print the data we are receiving
                 # Maintain the control loop frequency (50 Hz).
                 elapsed = time.monotonic() - loop_start
                 time.sleep(max(0, 0.02 - elapsed))
