@@ -1240,7 +1240,7 @@ class Base(BaseObject, Events):
                 self._asyncio_loop_alive = True
                 # self._asyncio_loop.run_until_complete(_asyncio_loop())
                 self._asyncio_loop.run_until_complete(self._asyncio_loop_func())
-            except Exception as e:
+            except Exception:
                 pass
 
             self._asyncio_loop_alive = False

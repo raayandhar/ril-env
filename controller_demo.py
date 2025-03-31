@@ -3,16 +3,31 @@ import pathlib
 from multiprocessing.managers import SharedMemoryManager
 import logging
 
+# Suppose these come from your own modules:
 from ril_env.spacemouse import Spacemouse
-from ril_env.xarm_controller import XArm, XArmConfig, XArmController
 from ril_env.multi_realsense import MultiRealsense
 from ril_env.video_recorder import VideoRecorder
 
+# Import the new xarm classes
+from ril_env.xarm_controller import XArmConfig, XArmProcess, XArmClient
+
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def main():
-    xarm_config = XArmConfig()
 
+def main():
+    # 1) xArm config
+    xarm_config = XArmConfig(
+        ip="192.168.1.223",
+        tcp_maxacc=5000,
+        position_gain=2.0,
+        orientation_gain=2.0,
+        home_pos=[0, 0, 0, 70, 0, 70, 0],
+        home_speed=50.0,
+        verbose=True,
+    )
+
+    # 2) Video setup
     video_dir = pathlib.Path("recordings")
     video_dir.mkdir(parents=True, exist_ok=True)
 
@@ -27,7 +42,6 @@ def main():
 
     with SharedMemoryManager() as shm_manager, \
          Spacemouse(deadzone=0.4) as sm, \
-         XArm(xarm_config) as arm, \
          MultiRealsense(
              shm_manager=shm_manager,
              record_fps=30,
@@ -38,59 +52,76 @@ def main():
              verbose=True,
          ) as multi:
 
-        # Start the XArmController for data collection.
-        xarm_ctrl = XArmController(arm, shm_manager, frequency=50, verbose=True)
-        xarm_ctrl.start()
-        
-        print("MultiRealsense cameras started and ready.")
+        # 3) Create the XArmProcess in the main process
+        xarm_proc = XArmProcess(
+            config=xarm_config,
+            shm_manager=shm_manager,
+            frequency=20.0,   # 20 Hz data capture
+            buffer_size=256,  # ring buffer capacity
+        )
+
+        # Wrap it with XArmClient
+        xarm_client = XArmClient(xarm_proc)
+
+        # Start the xarm background process
+        xarm_client.start(wait=2.0)
+
+        logger.info("MultiRealsense cameras started and ready.")
         multi.set_exposure(exposure=120, gain=0)
         multi.set_white_balance(white_balance=5900)
 
+        # Start recording
         multi.start_recording(str(video_dir), start_time=time.time())
-        print(f"Recording started. Videos will be saved in {video_dir.absolute()}.")
+        logger.info(f"Recording started. Videos will be saved in {video_dir.absolute()}.")
 
         try:
             while True:
                 loop_start = time.monotonic()
-                time.sleep(0.01)
 
+                # 1) Grab spacemouse motion
                 sm_state = sm.get_motion_state_transformed()
                 dpos = sm_state[:3]
                 drot = sm_state[3:]
-                grasp = sm.grasp
+                grasp = sm.grasp  # 0 or 1
 
-                # If the designated button is pressed, re-home the arm.
+                # If button 1 pressed => home
                 if sm.is_button_pressed(1):
-                    arm.home()
+                    xarm_client.home()
                     continue
 
-                # Command a step via the controller.
-                xarm_ctrl.step(dpos, drot, grasp)
+                # 2) Send step command
+                xarm_client.step(dpos, drot, grasp)
 
+                # 3) Retrieve the latest ring-buffer sample
+                latest_sample = xarm_client.get_state(k=None)
+                # For printing demonstration:
+                # If k=None, we get a single sample dict => "TCPPose", etc.
+                # If k=10, we'd get the last 10 samples as stacked arrays.
+
+                if latest_sample:
+                    print("Latest xArm data:")
+                    for key, val in latest_sample.items():
+                        print(f"  {key}: {val}")
+
+                # Basic timing
                 elapsed = time.monotonic() - loop_start
-                sleep_time = max(0, 0.02 - elapsed)
-                time.sleep(sleep_time)
+                # We'll do ~50 Hz loop here
+                time.sleep(max(0, 0.02 - elapsed))
+
         except KeyboardInterrupt:
             print("\nStopped by user.")
         finally:
             multi.stop_recording()
-            print("Recording stopped.")
+            logger.info("Recording stopped.")
 
-            # Stop the controller process and wait for it to finish.
-            xarm_ctrl.stop()
-            xarm_ctrl.join()
+            # 4) Stop xarm background process
+            xarm_client.stop()
 
-            # Retrieve collected data.
-            collected_data = xarm_ctrl.get_state()
-            num_samples = len(collected_data)
-            print(f"Collected {num_samples} entries from the ring buffer:")
-            if num_samples == 0:
-                print("No data was collected!")
-            else:
-                # If there are fewer than 10 entries, print all of them.
-                samples_to_print = collected_data if num_samples < 10 else xarm_ctrl.get_state(k=10)
-                for sample in samples_to_print:
-                    print(sample)
+            # Dump all data in ring buffer if you like:
+            # full_data = xarm_client.get_state(k=256)  # last 256 samples
+            # or xarm_client.proc.ring_buffer.get_all()
+            # do something with that data if needed
+
 
 if __name__ == "__main__":
     main()

@@ -1,15 +1,9 @@
 import numpy as np
 import os
-import time
 import cv2
-from scipy.spatial.transform import Rotation as R
 import open3d as o3d
-import torch
 import copy
-from cv2 import aruco
-import imageio
 from sklearn.neighbors import NearestNeighbors
-import scipy.spatial as spatial
 
 # from simpleicp import PointCloud, SimpleICP
 

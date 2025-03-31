@@ -8,10 +8,6 @@
 
 import time
 import math
-import functools
-from ..core.utils.log import logger
-from .code import APIState
-from ..core.config.x_config import XCONF
 
 
 def compare_time(time1, time2):

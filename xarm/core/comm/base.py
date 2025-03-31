@@ -9,7 +9,6 @@
 import time
 import queue
 import socket
-import select
 import threading
 from ..utils.log import logger
 from ..utils import convert

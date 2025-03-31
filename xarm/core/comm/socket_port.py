@@ -8,10 +8,8 @@
 # Author: Vinman <vinman.wen@ufactory.cc> <vinman.cub@gmail.com>
 
 
-import queue
 import os
 import socket
-import struct
 import platform
 import threading
 import time
@@ -133,7 +131,7 @@ class SocketPort(Port):
                             )
                         )
                         use_uds = True
-                    except Exception as e:
+                    except Exception:
                         pass
                         # logger.error('use uds error, {}'.format(e))
             else:

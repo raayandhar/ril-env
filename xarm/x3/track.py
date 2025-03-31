@@ -10,7 +10,6 @@ from .code import APIState
 from .gpio import GPIO
 from .decorator import (
     xarm_is_connected,
-    xarm_wait_until_not_pause,
     xarm_is_not_simulation_mode,
 )
 

@@ -8,7 +8,6 @@
 
 import json
 import time
-import uuid
 from urllib import request
 from .code import APIState
 from ..core.config.x_config import XCONF
@@ -43,7 +42,7 @@ class Record(Base):
                 ]
             else:
                 return APIState.API_EXCEPTION, []
-        except Exception as e:
+        except Exception:
             return APIState.API_EXCEPTION, []
 
     @xarm_is_connected(_type="set")
