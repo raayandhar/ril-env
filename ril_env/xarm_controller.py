@@ -4,9 +4,10 @@ import enum
 import multiprocessing as mp
 import numpy as np
 import logging
-from multiprocessing.managers import SharedMemoryManager
 
 from xarm.wrapper import XArmAPI
+from typing import List
+from multiprocessing.managers import SharedMemoryManager
 from shared_memory.shared_memory_queue import SharedMemoryQueue, Empty
 from shared_memory.shared_memory_ring_buffer import SharedMemoryRingBuffer
 
@@ -22,26 +23,26 @@ logger = logging.getLogger(__name__)
 class Command(enum.Enum):
     STOP = 0
     SERVOL = 1
-    SCHEDULE_WAYPOINT = 2  # Kept for compatibility, even if not used
+    SCHEDULE_WAYPOINT = 2 # Not used.
 
 class XArmController(mp.Process):
-    """
-    XArmController replicates the structure of RTDEInterpolationController:
-      - Uses shared memory queues to receive commands.
-      - Uses a ring buffer to store state, seeded with an example that includes a relative robot timestamp.
-      - In its control loop, it processes commands and directly commands the robot via set_servo_cartesian.
-    """
     def __init__(self,
                  shm_manager: SharedMemoryManager,
-                 ip: str = "192.168.1.223",
                  frequency: int = 50,
-                 soft_real_time: bool = False,
                  verbose: bool = True):
         super().__init__(name="XArmController")
-        self.ip = ip
+
+        self.shm_manager = shm_manager
         self.frequency = frequency
-        self.soft_real_time = soft_real_time
         self.verbose = verbose
+
+        # Constants copied over from the config
+        self.ip: str = "192.168.1.223"
+        self.position_gain: float = 2.0
+        self.orientation_gain: float = 2.0
+        self.home_pos: List[int] = [0, 0, 0, 70, 0, 70, 0]
+        self.home_speed: float = 50.0
+
         if self.verbose:
             logger.setLevel(logging.DEBUG)
 
@@ -49,8 +50,7 @@ class XArmController(mp.Process):
         self.ready_event = mp.Event()
         self.stop_event = mp.Event()
 
-        # --- Build Input Queue ---
-        # The example command has the same keys as the RTDE controller.
+        # Build Input Queue
         queue_example = {
             'cmd': Command.SERVOL.value,
             'target_pose': np.zeros(6, dtype=np.float64),  # [x, y, z, roll, pitch, yaw]
@@ -63,8 +63,8 @@ class XArmController(mp.Process):
             buffer_size=256
         )
 
-        # --- Build Ring Buffer ---
-        # To mimic the RTDE approach, we first connect temporarily to the xArm to obtain initial state.
+        #  Build Ring Buffer
+        # We first connect temporarily to the xArm to obtain initial state.
         try:
             arm_temp = XArmAPI(self.ip)
             arm_temp.connect()
@@ -81,7 +81,7 @@ class XArmController(mp.Process):
                 raise RuntimeError(f"set_state error: {code}")
 
             # Mimic the RTDE 'receive_keys' approach using a list of state keys.
-            receive_keys = ['TCPPose', 'TCPSpeed', 'JointAngles', 'JointSpeeds']
+            # receive_keys = ['TCPPose', 'TCPSpeed', 'JointAngles', 'JointSpeeds']
             state_example = {}
 
             # Get TCPPose: use get_position (first 6 values: x,y,z,roll,pitch,yaw)
@@ -163,20 +163,16 @@ class XArmController(mp.Process):
 
     def run(self):
         """
+        When we call .start(wait=True) this internally
+        invokes the run() method in a separate process.
         Main loop:
           - Reconnects to xArm and initializes it.
           - Enters a loop running at the desired frequency.
           - Processes all commands from the shared memory queue.
           - Commands the robot using set_servo_cartesian with the latest target pose.
-          - Fetches robot state using API calls (mimicking getattr style) and stores it in the ring buffer.
-          - The 'robot_receive_timestamp' is now stored as relative time since this process started.
+          - Fetches robot state (getattr style) and stores it in the ring buffer.
+          - The 'robot_receive_timestamp' is stored as relative time
         """
-        if self.soft_real_time:
-            try:
-                os.sched_setscheduler(0, os.SCHED_RR, os.sched_param(20))
-            except Exception as e:
-                logger.error(f"Real-time scheduling failed: {e}")
-
         try:
             logger.info(f"[XArmController] Connecting to xArm at {self.ip}")
             arm = XArmAPI(self.ip)
@@ -193,8 +189,8 @@ class XArmController(mp.Process):
             code = arm.set_state(0)
             if code != 0:
                 raise RuntimeError(f"set_state error: {code}")
-
-            # Initialize last_target_pose using the current robot pose.
+ 
+           # Initialize last_target_pose using the current robot pose.
             code, pos = arm.get_position(is_radian=False)
             if code == 0:
                 self.last_target_pose = np.array(pos[:6], dtype=np.float64)
