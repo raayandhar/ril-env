@@ -34,7 +34,7 @@ def main():
                 drot *= xarm_ctrl.orientation_gain
 
                 curr_rot = st.Rotation.from_euler(
-                    "xyz", xarm_ctrl.current_orientation, degrees=True
+                    "xyz", current_target_pose[3:], degrees=True
                 )
                 delta_rot = st.Rotation.from_euler("xyz", drot, degrees=True)
                 final_rot = delta_rot * curr_rot
@@ -42,11 +42,6 @@ def main():
                 current_target_pose[:3] += dpos
                 current_target_pose[3:] = final_rot.as_euler("xyz", degrees=True)
 
-                # Update target pose (with scaling if needed).
-                # current_target_pose[:3] += dpos
-                # current_target_pose[3:] += drot
-                # Need to test this
-                # Create and send a STEP command.
                 command = {
                     "cmd": Command.STEP.value,
                     "target_pose": current_target_pose,
@@ -54,20 +49,12 @@ def main():
                     "duration": 0.02,
                     "target_time": time.time() + 0.02,
                 }
-                """
-                command = {
-                    'cmd': Command.STEP.value,
-                    'dpos': dpos,
-                    'drot': drot,
-                    'grasp': grasp,
-                    'duration': 0.02,
-                    'target_time': time.time() + 0.02,
-                }
-                """
+
                 xarm_ctrl.input_queue.put(command)
 
                 # Fetch the latest state from the ring buffer.
-                state = xarm_ctrl.get_state()
+                state = xarm_ctrl.get_state(k=5)
+                print("Last 5 states: ", state)
                 ts = state.get("robot_receive_timestamp")
                 # Check if the timestamp has updated.
                 if ts != last_timestamp:
