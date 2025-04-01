@@ -241,7 +241,9 @@ class XArmController(mp.Process):
                         arm.set_state(0)
                         code = arm.set_gripper_position(850, wait=False)
                         if code != 0:
-                            logger.error(f"Error in set_gripper_position (HOME open): {code}")
+                            logger.error(
+                                f"Error in set_gripper_position (HOME open): {code}"
+                            )
                         code = arm.set_servo_angle(
                             angle=self.home_pos, speed=self.home_speed, wait=True
                         )
@@ -338,7 +340,9 @@ class XArmController(mp.Process):
                 arm.set_mode(0)
                 arm.set_state(0)
                 arm.disconnect()
-                logger.info(f"[XArmController] Disconnected from xArm at {self.robot_ip}")
+                logger.info(
+                    f"[XArmController] Disconnected from xArm at {self.robot_ip}"
+                )
             except Exception as e:
                 logger.error(f"[XArmController] Cleanup error: {e}")
             self.ready_event.set()
@@ -348,7 +352,8 @@ def main():
     with SharedMemoryManager() as shm_manager, Spacemouse(deadzone=0.4) as sm:
         xarm_config = XArmConfig()
         xarm_ctrl = XArmController(
-            shm_manager=shm_manager, xarm_config=xarm_config,
+            shm_manager=shm_manager,
+            xarm_config=xarm_config,
         )
         xarm_ctrl.start(wait=True)
         print("XArmController started and ready.")
@@ -379,7 +384,7 @@ def main():
                     xarm_ctrl.input_queue.put(command)
 
                     time.sleep(1.0)
-                    updated_state  = xarm_ctrl.get_state()
+                    updated_state = xarm_ctrl.get_state()
                     new_pose = updated_state["TCPPose"]
                     current_target_pose[:] = new_pose
                     continue
@@ -411,7 +416,7 @@ def main():
                 if ts != last_timestamp:
                     logger.debug(f"Ring buffer updated, time: {ts:.3f}")
                     last_timestamp = ts
-                
+
                 elapsed = time.monotonic() - loop_start
                 time.sleep(max(0, 0.02 - elapsed))
         except KeyboardInterrupt:
