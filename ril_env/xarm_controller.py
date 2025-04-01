@@ -11,6 +11,8 @@ from multiprocessing.managers import SharedMemoryManager
 from shared_memory.shared_memory_queue import SharedMemoryQueue, Empty
 from shared_memory.shared_memory_ring_buffer import SharedMemoryRingBuffer
 from dataclasses import dataclass, field
+from ril_env.spacemouse import Spacemouse
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -28,211 +30,14 @@ class XArmConfig:
     orientation_gain: float = 2.0
     home_pos: List[int] = field(default_factory=lambda: [0, 0, 0, 70, 0, 70, 0])
     home_speed: float = 50.0
+    tcp_maxacc: int = 5000
     verbose: bool = True
-
-
-class XArm:
-    """
-    At this point, this is legacy code. If you want to record
-    data, please use the multiprocessing-emabled XArmController.
-    """
-
-    def __init__(self, xarm_config: XArmConfig):
-        self.config = xarm_config
-        self.init = False
-
-        self.current_position = None
-        self.current_orientation = None
-        self.previous_grasp = 0.0
-
-        if self.config.verbose:
-            logger.setLevel(logging.DEBUG)
-
-    @property
-    def is_ready(self):
-        return self.init
-
-    def initialize(self):
-        self.arm = XArmAPI(self.config.ip)
-        arm = self.arm
-
-        arm.connect()
-        arm.clean_error()
-        arm.clean_warn()
-
-        code = arm.motion_enable(enable=True)
-        if code != 0:
-            logger.error(f"Error in motion_enable: {code}")
-            raise RuntimeError(f"Error in motion_enable: {code}")
-
-        arm.set_tcp_maxacc(self.config.tcp_maxacc)
-
-        code = arm.set_mode(1)
-        if code != 0:
-            logger.error(f"Error in set_mode: {code}")
-            raise RuntimeError(f"Error in set_mode: {code}")
-
-        code = arm.set_state(0)
-        if code != 0:
-            logger.error(f"Error in set_state: {code}")
-            raise RuntimeError(f"Error in set_state: {code}")
-
-        code, state = arm.get_state()
-        if code != 0:
-            logger.error(f"Error getting robot state: {code}")
-            raise RuntimeError(f"Error getting robot state: {code}")
-        if state != 0:
-            logger.error(f"Robot is not ready to move. Current state: {state}")
-            raise RuntimeError(f"Robot is not ready to move. Current state: {state}")
-        else:
-            logger.info(f"Robot is ready to move. Current state: {state}")
-
-        err_code, warn_code = arm.get_err_warn_code()
-        if err_code != 0 or warn_code != 0:
-            logger.error(
-                f"Error code: {err_code}, Warning code: {warn_code}. Cleaning error and warning."
-            )
-            arm.clean_error()
-            arm.clean_warn()
-            arm.motion_enable(enable=True)
-            arm.set_state(0)
-
-        code = arm.set_gripper_mode(0)
-        if code != 0:
-            logger.error(f"Error in set_gripper_mode: {code}")
-            raise RuntimeError(f"Error in set_gripper_mode: {code}")
-
-        code = arm.set_gripper_enable(True)
-        if code != 0:
-            logger.error(f"Error in set_gripper_enable: {code}")
-            raise RuntimeError(f"Error in set_gripper_enable: {code}")
-
-        code = arm.set_gripper_speed(1000)
-        if code != 0:
-            logger.error(f"Error in set_gripper_speed: {code}")
-            raise RuntimeError(f"Error in set_gripper_speed: {code}")
-
-        self.init = True
-        time.sleep(3)
-        self.home()
-        time.sleep(3)
-        logger.info("Successfully initialized xArm.")
-
-    def shutdown(self):
-        if not self.init:
-            logger.error("shutdown() called on an uninitialized xArm.")
-            return
-        self.home()
-        self.arm.disconnect()
-        logger.info("xArm shutdown complete.")
-
-    def home(self):
-        logger.info("Homing robot.")
-        if not self.init:
-            logger.error("xArm not initialized.")
-            raise RuntimeError("xArm not initialized.")
-
-        arm = self.arm
-        arm.set_mode(0)
-        arm.set_state(0)
-        code = arm.set_gripper_position(850, wait=False)
-        if code != 0:
-            logger.error(f"Error in set_gripper_position (open, homing): {code}")
-            raise RuntimeError(f"Error in set_gripper_position (open, homing): {code}")
-
-        code = arm.set_servo_angle(
-            angle=self.config.home_pos, speed=self.config.home_speed, wait=True
-        )
-        if code != 0:
-            logger.error(f"Error in set_servo_angle (homing): {code}")
-            raise RuntimeError(f"Error in set_servo_angle (homing): {code}")
-        arm.set_mode(1)
-        arm.set_state(0)
-
-        code, pose = arm.get_position()
-        if code != 0:
-            logger.error(f"Failed to query initial pose: {code}")
-            raise RuntimeError(f"Failed to query initial pose: {code}")
-        else:
-            self.current_position = np.array(pose[:3])
-            self.current_orientation = np.array(pose[3:])
-            logger.debug(
-                f"Initial pose set: pos={self.current_position}, ori={self.current_orientation}"
-            )
-
-    def step(self, dpos, drot, grasp):
-        if not self.init:
-            logger.error("xArm not initialized. Use it in a 'with' block")
-            raise RuntimeError("xArm not initialized. Use it in a 'with' block")
-
-        dpos *= self.config.position_gain
-        drot *= self.config.orientation_gain
-
-        curr_rot = st.Rotation.from_euler("xyz", self.current_orientation, degrees=True)
-        delta_rot = st.Rotation.from_euler("xyz", drot, degrees=True)
-        final_rot = delta_rot * curr_rot
-
-        self.current_orientation = final_rot.as_euler("xyz", degrees=True)
-        self.current_position += dpos
-
-        logger.debug(f"Current position: {self.current_position}")
-        logger.debug(f"Current orientation: {self.current_orientation}")
-
-        code = self.arm.set_servo_cartesian(
-            np.concatenate((self.current_position, self.current_orientation)),
-            is_radian=False,
-        )
-        if code != 0:
-            logger.error(f"Error in set_servo_cartesian in step(): {code}")
-            raise RuntimeError(f"Error in set_servo_cartesian in step(): {code}")
-
-        if grasp != self.previous_grasp:
-            if grasp == 1.0:
-                code = self.arm.set_gripper_position(0, wait=False)
-                if code != 0:
-                    logger.error(f"Error in set_gripper_position (close): {code}")
-                    raise RuntimeError(f"Error in set_gripper_position (close): {code}")
-            else:
-                code = self.arm.set_gripper_position(850, wait=False)
-                if code != 0:
-                    logger.error(f"Error in set_gripper_position (open): {code}")
-                    raise RuntimeError(f"Error in set_gripper_position (open): {code}")
-            self.previous_grasp = grasp
-
-    def get_state(self):
-        state = {}
-
-        code, actual_pose = self.arm.get_position(is_radian=False)
-        if code != 0:
-            logger.error(f"Error getting TCP pose: code {code}")
-            raise RuntimeError(f"Error getting TCP pose: code {code}")
-        state["ActualTCPPose"] = actual_pose
-
-        actual_tcp_speed = self.arm.realtime_tcp_speed()
-        state["ActualTCPSpeed"] = actual_tcp_speed
-
-        code, actual_angles = self.arm.get_servo_angle(is_radian=False)
-        if code != 0:
-            logger.error(f"Error getting joint angles: code {code}")
-            raise RuntimeError(f"Error getting joint angles: code {code}")
-        state["ActualQ"] = actual_angles
-
-        actual_joint_speeds = self.arm.realtime_joint_speeds()
-        state["ActualQd"] = actual_joint_speeds
-
-        return state
-
-    def __enter__(self):
-        self.initialize()
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.shutdown()
 
 
 class Command(enum.Enum):
     STOP = 0
     STEP = 1
+    HOME = 2
     # May add more commands here. e.g. SCHEDULE_WAYPOINT
 
 
@@ -250,6 +55,7 @@ class XArmController(mp.Process):
         self.orientation_gain = xarm_config.orientation_gain
         self.home_pos = xarm_config.home_pos
         self.home_speed = xarm_config.home_speed
+        self.tcp_maxacc = xarm_config.tcp_maxacc
         self.verbose = xarm_config.verbose
 
         if self.verbose:
@@ -272,12 +78,12 @@ class XArmController(mp.Process):
         )
 
         # Build Ring Buffer.
-        # We first connect temporarily to the xArm to obtain initial state.
         try:
-            arm_temp = XArmAPI(self.ip)
+            arm_temp = XArmAPI(self.robot_ip)
             arm_temp.connect()
             arm_temp.clean_error()
             arm_temp.clean_warn()
+            arm_temp.set_tcp_maxacc(xarm_config.tcp_maxacc)
             code = arm_temp.motion_enable(True)
             if code != 0:
                 raise RuntimeError(f"motion_enable error: {code}")
@@ -324,7 +130,7 @@ class XArmController(mp.Process):
             except Exception:
                 state_example["JointSpeeds"] = np.zeros(7, dtype=np.float64)
 
-            # Robot timestamp similar to RTDE controller (absolute for now).
+            # Robot timestamp (absolute for now).
             state_example["robot_receive_timestamp"] = time.time()
 
             # Initialize our grasp state.
@@ -357,7 +163,6 @@ class XArmController(mp.Process):
         logger.debug(f"[XArmController] Process spawned at {self.pid}")
 
     def stop(self, wait=True):
-        # Place a STOP command into the input queue and set the stop event.
         message = {"cmd": Command.STOP.value}
         self.input_queue.put(message)
         self.stop_event.set()
@@ -372,16 +177,13 @@ class XArmController(mp.Process):
             return self.ring_buffer.get_last_k(k)
 
     def run(self):
-        """
-        When we call .start(wait=True) this internally
-        invokes the run() method in a separate process.
-        """
         try:
-            logger.info(f"[XArmController] Connecting to xArm at {self.ip}")
-            arm = XArmAPI(self.ip)
+            logger.info(f"[XArmController] Connecting to xArm at {self.robot_ip}")
+            arm = XArmAPI(self.robot_ip)
             arm.connect()
             arm.clean_error()
             arm.clean_warn()
+            arm.set_tcp_maxacc(self.tcp_maxacc)
 
             code = arm.motion_enable(True)
             if code != 0:
@@ -393,7 +195,6 @@ class XArmController(mp.Process):
             if code != 0:
                 raise RuntimeError(f"[XArmController] set_state error: {code}")
 
-            # Initialize last_target_pose using the current robot pose.
             code, pos = arm.get_position(is_radian=False)
             if code == 0:
                 self.last_target_pose = np.array(pos[:6], dtype=np.float64)
@@ -410,6 +211,7 @@ class XArmController(mp.Process):
             iter_idx = 0
 
             while not self.stop_event.is_set():
+                grasp = self.previous_grasp
                 t_start = time.time()
 
                 try:
@@ -421,27 +223,45 @@ class XArmController(mp.Process):
                 for i in range(n_cmd):
                     command = {key: commands[key][i] for key in commands}
                     cmd = command["cmd"]
+                    print(cmd)
                     if cmd == Command.STOP.value:
                         logger.debug("[XArmController] Received STOP command.")
                         self.stop_event.set()
                         break
                     elif cmd == Command.STEP.value:
+                        print("HELLO")
                         target_pose = np.array(command["target_pose"], dtype=np.float64)
                         grasp = command["grasp"]
                         self.last_target_pose = target_pose
+                        print("HELLO AGAIN")
                         logger.debug(f"[XArmController] New target pose: {target_pose}")
+                    elif cmd == Command.HOME.value:
+                        logger.info("[XArmController] Received HOME command.")
+                        arm.set_mode(0)
+                        arm.set_state(0)
+                        code = arm.set_gripper_position(850, wait=False)
+                        if code != 0:
+                            logger.error(f"Error in set_gripper_position (HOME open): {code}")
+                        code = arm.set_servo_angle(
+                            angle=self.home_pos, speed=self.home_speed, wait=True
+                        )
+                        arm.set_mode(1)
+                        arm.set_state(0)
+                        code, pos = arm.get_position(is_radian=False)
+                        if code == 0:
+                            self.last_target_pose = np.array(pos[:6], dtype=np.float64)
                     else:
                         logger.error(f"[XArmController] Unknown command: {cmd}")
 
-                # Move to target pose.
+                # If the last command wasn't STOP or HOME, we do a servo step
                 code = arm.set_servo_cartesian(
                     list(self.last_target_pose), is_radian=False
                 )
 
-                # Update grasp.
+                # Update gripper.
                 if grasp != self.previous_grasp:
                     if grasp == 1.0:
-                        code = self.arm.set_gripper_position(0, wait=False)
+                        code = arm.set_gripper_position(0, wait=False)
                         if code != 0:
                             logger.error(
                                 f"Error in set_gripper_position (close): {code}"
@@ -450,7 +270,7 @@ class XArmController(mp.Process):
                                 f"Error in set_gripper_position (close): {code}"
                             )
                     else:
-                        code = self.arm.set_gripper_position(850, wait=False)
+                        code = arm.set_gripper_position(850, wait=False)
                         if code != 0:
                             logger.error(
                                 f"Error in set_gripper_position (open): {code}"
@@ -463,7 +283,7 @@ class XArmController(mp.Process):
                 if code != 0:
                     logger.error(f"[XArmController] set_servo_cartesian error: {code}")
 
-                # Update Robot State
+                # Update robot state
                 state = {}
                 code, pos = arm.get_position(is_radian=False)
                 if code == 0:
@@ -497,22 +317,12 @@ class XArmController(mp.Process):
                     logger.error(f"Error in realtime_joint_speeds: {e}")
                     state["JointSpeeds"] = np.zeros(7, dtype=np.float64)
 
-                try:
-                    if callable(arm.get_gripper_position):
-                        gripper_pos = arm.get_gripper_position()
-                    else:
-                        gripper_pos = arm.get_gripper_position
-                    state["Grasp"] = gripper_pos
-                except Exception as e:
-                    logger.error(f"Error in get_gripper_position: {e}")
-                    state["Grasp"] = 0.0
-
+                state["Grasp"] = self.previous_grasp
                 state["robot_receive_timestamp"] = time.time() - start_time
 
-                # Store the current state into the ring buffer.
+                # Update ring buffer (data)
                 self.ring_buffer.put(state)
 
-                # Regulate loop frequency.
                 elapsed = time.time() - t_start
                 sleep_time = dt - elapsed
                 if sleep_time > 0:
@@ -528,7 +338,88 @@ class XArmController(mp.Process):
                 arm.set_mode(0)
                 arm.set_state(0)
                 arm.disconnect()
-                logger.info(f"[XArmController] Disconnected from xArm at {self.ip}")
+                logger.info(f"[XArmController] Disconnected from xArm at {self.robot_ip}")
             except Exception as e:
                 logger.error(f"[XArmController] Cleanup error: {e}")
             self.ready_event.set()
+
+
+def main():
+    with SharedMemoryManager() as shm_manager, Spacemouse(deadzone=0.4) as sm:
+        xarm_config = XArmConfig()
+        xarm_ctrl = XArmController(
+            shm_manager=shm_manager, xarm_config=xarm_config,
+        )
+        xarm_ctrl.start(wait=True)
+        print("XArmController started and ready.")
+
+        # Keep our local "target_pose" so orientation accumulates properly
+        current_target_pose = xarm_ctrl.last_target_pose.copy()
+
+        last_timestamp = None
+        try:
+            while True:
+                loop_start = time.monotonic()
+
+                sm_state = sm.get_motion_state_transformed()
+                dpos = sm_state[:3]
+                drot = sm_state[3:]
+                grasp = sm.grasp
+
+                # Right button -> HOME
+                # DO NOT MOVE THE SPACEMOUSE WHILE CLICKING THIS.
+                if sm.is_button_pressed(1):
+                    command = {
+                        "cmd": Command.HOME.value,
+                        "target_pose": np.zeros(6, dtype=np.float64),
+                        "grasp": 0.0,
+                        "duration": 0.0,
+                        "target_time": time.time(),
+                    }
+                    xarm_ctrl.input_queue.put(command)
+
+                    time.sleep(1.0)
+                    updated_state  = xarm_ctrl.get_state()
+                    new_pose = updated_state["TCPPose"]
+                    current_target_pose[:] = new_pose
+                    continue
+
+                dpos *= xarm_ctrl.position_gain
+                drot *= xarm_ctrl.orientation_gain
+
+                curr_orientation = current_target_pose[3:]
+                curr_rot = st.Rotation.from_euler("xyz", curr_orientation, degrees=True)
+                delta_rot = st.Rotation.from_euler("xyz", drot, degrees=True)
+                final_rot = delta_rot * curr_rot
+
+                current_target_pose[:3] += dpos
+                current_target_pose[3:] = final_rot.as_euler("xyz", degrees=True)
+
+                command = {
+                    "cmd": Command.STEP.value,
+                    "target_pose": current_target_pose,
+                    "grasp": grasp,
+                    "duration": 0.02,
+                    "target_time": time.time() + 0.02,
+                }
+                xarm_ctrl.input_queue.put(command)
+
+                # Check the ring buffer to see if the child updated
+                state = xarm_ctrl.get_state(k=1)
+                logger.debug(f"Most recent state: {state}")
+                ts = state.get("robot_receive_timestamp")[0]
+                if ts != last_timestamp:
+                    logger.debug(f"Ring buffer updated, time: {ts:.3f}")
+                    last_timestamp = ts
+                
+                elapsed = time.monotonic() - loop_start
+                time.sleep(max(0, 0.02 - elapsed))
+        except KeyboardInterrupt:
+            print("\nStopped by user.")
+        finally:
+            xarm_ctrl.stop(wait=True)
+            print("XArmController stopped.")
+
+
+if __name__ == "__main__":
+    main()
