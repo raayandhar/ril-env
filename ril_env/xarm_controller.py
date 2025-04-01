@@ -428,11 +428,9 @@ class XArmController(mp.Process):
                         self.stop_event.set()
                         break
                     elif cmd == Command.STEP.value:
-                        print("HELLO")
                         target_pose = np.array(command["target_pose"], dtype=np.float64)
                         grasp = command["grasp"]
                         self.last_target_pose = target_pose
-                        print("HELLO AGAIN")
                         logger.debug(f"[XArmController] New target pose: {target_pose}")
                     elif cmd == Command.HOME.value:
                         # Currently, there are some issues here. It is best to move closer
@@ -607,6 +605,7 @@ def main():
                 # This is a workaround that does not use home_pos
                 # This will have to be fixed later.
                 # This is also like insanely dangerous...
+                """
                 if sm.is_button_pressed(1):
                     current_target_pose = [
                         475.791901,
@@ -616,6 +615,7 @@ def main():
                         -0.010084,
                         0.77567,
                     ]
+                """
 
                 command = {
                     "cmd": Command.STEP.value,
