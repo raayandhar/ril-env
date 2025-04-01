@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class XArmConfig:
     robot_ip: str = "192.168.1.223"
-    frequency: int = 50
+    frequency: int = 30
     position_gain: float = 2.0
     orientation_gain: float = 2.0
     home_pos: List[int] = field(default_factory=lambda: [0, 0, 0, 70, 0, 70, 0])
@@ -353,6 +353,10 @@ class XArmController(mp.Process):
 
         # Store the last target pose; initialize it from the example.
         self.last_target_pose = state_example["TCPPose"]
+
+    @property
+    def is_ready(self):
+        return self.ready_event.is_set()
 
     def start(self, wait=True):
         super().start()
