@@ -187,7 +187,13 @@ class RealEnv:
 
         self.start_time
 
-    # start-stop API
+    # Start-stop API
     @property
     def is_ready(self):
         return self.realsense.is_ready and self.robot.is_ready
+
+    def start(self, wait=True):
+        if wait:
+            pass
+        self.realsense.start(wait=False)
+        self.robot.start(wait=False)
