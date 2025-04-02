@@ -386,6 +386,9 @@ class XArmController(mp.Process):
         else:
             return self.ring_buffer.get_last_k(k)
 
+    def get_all_state(self):
+        return self.ring_buffer.get_all()
+
     def run(self):
         try:
             logger.info(f"[XArmController] Connecting to xArm at {self.robot_ip}")

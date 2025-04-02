@@ -1,4 +1,6 @@
 import logging
+import math
+import numpy as np
 import pathlib
 
 from multiprocessing.managers import SharedMemoryManager
@@ -31,6 +33,7 @@ class RealEnv:
         self,
         output_dir: Union[pathlib.Path, str] = "./recordings/",
         xarm_config: Optional[XArmConfig] = None,
+        frequency: int = 30,
         num_obs_steps: int = 2,
         obs_image_resolution: Tuple[int, int] = (640, 480),
         max_obs_buffer_size: int = 30,
@@ -56,7 +59,7 @@ class RealEnv:
         video_dir.mkdir(parents=True, exist_ok=True)
 
         zarr_path = str(output_dir.joinpath("replay_buffer.zarr").absolute())
-        replay_buffer = ReplayBuffer.create_from_path(zarr_path=zarr_path, mode='a')
+        replay_buffer = ReplayBuffer.create_from_path(zarr_path=zarr_path, mode="a")
 
         logger.info(f"[RealEnv] Output directory: {output_dir}")
         logger.info(f"[RealEnv] Video directory: {video_dir}")
@@ -65,7 +68,9 @@ class RealEnv:
         if xarm_config is None:
             xarm_config = XArmConfig()
 
-        assert xarm_config.frequency <= video_capture_fps, "Cannot run frequency faster than video capture."
+        assert (
+            frequency <= video_capture_fps
+        ), "Cannot run frequency faster than video capture."
 
         if shm_manager is None:
             shm_manager = SharedMemoryManager()
@@ -119,7 +124,7 @@ class RealEnv:
         recording_pix_fmt = "bgr24"
         if not record_raw_video:
             recording_transform = transform
-            recording_fps = xarm_config.frequency
+            recording_fps = frequency
             recording_pix_fmt = "rgb24"
 
         video_recorder = VideoRecorder.create_h264(
@@ -168,9 +173,10 @@ class RealEnv:
 
         self.realsense = realsense
         self.robot = robot
+        self.xarm_config = xarm_config
         self.multi_cam_vis = multi_cam_vis
         self.video_capture_fps = video_capture_fps
-        self.frequency = xarm_config.frequency
+        self.frequency = frequency
         self.num_obs_steps = num_obs_steps
         self.max_obs_buffer_size = max_obs_buffer_size
         self.obs_key_map = obs_key_map
@@ -194,6 +200,56 @@ class RealEnv:
 
     def start(self, wait=True):
         if wait:
-            pass
-        self.realsense.start(wait=False)
-        self.robot.start(wait=False)
+            self.realsense.start(wait=True)
+            self.robot.start(wait=True)
+        else:
+            self.realsense.start(wait=False)
+            self.robot.start(wait=False)
+        if self.multi_cam_vis is not None:
+            self.multi_cam_vis.start(wait=False)
+
+    def stop(self, wait=True):
+        # self.end_episode()
+        if wait:
+            self.realsense.stop(wait=True)
+            self.robot.start(wait=True)
+        else:
+            self.realsense.stop(wait=False)
+            self.robot.stop(wait=False)
+        if self.multi_cam_vis is not None:
+            self.multi_cam_vis.stop(wait=False)
+
+    def __enter__(self):
+        self.start()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.top()
+
+    # Async env API
+    def get_obs(self) -> Dict:
+        "observation dict"
+        assert self.is_ready
+
+        k = math.ceil(self.num_obs_steps * (self.video_capture_fps / self.frequency))
+        self.last_realsense_data = self.realsense.get(k=k, out=self.last_realsense_data)
+
+        # Running at 50 hz
+        last_robot_data = self.robot.get_all_state()
+
+        dt = 1 / self.frequency
+        last_timestamp = np.max([x['timestamp'][-1] for x in self.last_realsense_data.values()])
+        obs_align_timestamps = last_timestamp - (np.arange(self.num_obs_steps)[::-1] * dt)
+
+        camera_obs = dict()
+        for camera_idx, value in self.last_realsense_data.items():
+            this_timestamps = value['timestamp']
+            this_idxs = list()
+            for t in obs_align_timestamps:
+                is_before_idxs = np.nonzero(this_timestamps < t)[0]
+                this_idx = 0
+                if len(is_before_idxs) > 0:
+                    this_idx = is_before_idxs[-1]
+                this_idxs.append(this_idx)
+
+            camera_obs[f'camera_{camera_idx}'] = value['color'][this_idxs]
