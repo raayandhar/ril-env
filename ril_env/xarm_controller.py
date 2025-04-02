@@ -372,6 +372,13 @@ class XArmController(mp.Process):
         if wait:
             self.join()
 
+    def __enter__(self):
+        self.start()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.stop()
+
     def get_state(self, k=None):
         if k is None:
             logger.debug("[XArmController] In get_state(), k is None")
