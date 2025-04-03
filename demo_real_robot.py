@@ -1,22 +1,3 @@
-#!/usr/bin/env python
-
-"""
-Usage:
-(venv)$ python demo_real_robot.py -o <demo_save_dir> --robot_ip <ip_of_xarm>
-
-Robot movement (with SpaceMouse):
-- Default: Move the robot EEF in XY plane by moving the SpaceMouse.
-- Press left button on the SpaceMouse to enable rotation control (and lock translation).
-- Press right button on the SpaceMouse to unlock z-axis translation.
-
-Recording control:
-- Click the OpenCV window (ensure it is in focus).
-- Press "C" to start recording an episode.
-- Press "S" to stop recording.
-- Press "Q" to exit the program.
-- Press "Backspace" to delete the previously recorded episode.
-"""
-
 import time
 import traceback
 import click
@@ -34,15 +15,14 @@ from ril_env.precise_sleep import precise_wait
 from ril_env.xarm_controller import XArmConfig
 from ril_env.real_env import RealEnv
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def main(
     output="./recordings/", 
     vis_camera_idx=0, 
-    init_joints=True, 
-    frequency=10, 
+    init_joints=True, # Not used ATM
+    frequency=10, # Cannot increase frequency
     command_latency=0.01,
     record_res=(1280,720),
     spacemouse_deadzone=0.05,
@@ -71,7 +51,7 @@ def main(
             record_raw_video=True,
             thread_per_video=3,
             video_crf=21,
-            enable_multi_cam_vis=True,
+            enable_multi_cam_vis=False, # Totally broken RN
             multi_cam_vis_resolution=(1280, 720),
             shm_manager=shm_manager,
         ) as env:
@@ -103,40 +83,37 @@ def main(
 
                     press_events = key_counter.get_press_events()
 
+                    # Just force start:
+                    env.start_episode()
+                    is_recording = True
+
                     for key_stroke in press_events:
                         if key_stroke == KeyCode(char="q"):
-                            # Exit program
                             logger.info("Quit requested...")
                             stop = True
                         elif key_stroke == KeyCode(char="c"):
-                            # Start recording
                             env.start_episode()
                             is_recording = True
                             logger.info("Recording started!")
                         elif key_stroke == KeyCode(char="s"):
-                            # Stop recording
                             env.end_episode()
                             is_recording = False
                             logger.info("Recording stopped.")
                         elif key_stroke == Key.backspace:
-                            # Delete the most recent recorded episode
                             if click.confirm("Drop the most recently recorded episode?"):
                                 env.drop_episode()
                                 is_recording = False
                                 logger.info("Episode dropped.")
-                    print("\n\n HERE10!! \n\n")
-                    # Check for stage information (e.g., spacebar pressed)
-                    stage_val = key_counter[Key.space]  # 0 if not pressed, 1 if pressed
-                    print("\n\n HERE11!! \n\n")
-                    # Visualize camera feed
-                    vis_img = obs[f"camera_{vis_camera_idx}"][-1, :, :, ::-1].copy()
-                    print("\n\n HERE12!! \n\n")
-                    # Add text overlay with status information
+
+                    stage_val = key_counter[Key.space]
+
+                    # vis_img = obs[f"camera_{vis_camera_idx}"][-1, :, :, ::-1].copy()
+
                     episode_id = env.replay_buffer.n_episodes
                     text_str = f"Episode: {episode_id}, Stage: {stage_val}"
                     if is_recording:
                         text_str += " [RECORDING]"
-                    print("\n\n HERE13!! \n\n")
+                    """
                     cv2.putText(
                         vis_img,
                         text_str,
@@ -146,15 +123,15 @@ def main(
                         color=(255, 255, 255),
                         thickness=2,
                     )
-                    print("\n\n HERE14!! \n\n")
-                    #cv2.imshow("Robot Teleop", vis_img)
-                    #cv2.waitKey(1)
-                    print("\n\n HERE15!! \n\n")
-                    # Wait precisely until sample time, then read SpaceMouse
+
+                    cv2.imshow("Robot Teleop", vis_img)
+                    cv2.waitKey(1)
+
+                    """
                     precise_wait(t_sample)
-                    print("\n\n HERE16!! \n\n")
+
                     sm_state = sm.get_motion_state_transformed()
-                    print(f"SM state: {sm_state}")
+
                     dpos = sm_state[:3]
                     drot = sm_state[3:]
                     grasp = sm.grasp
@@ -169,6 +146,7 @@ def main(
                     target_pose[:3] += dpos
                     target_pose[3:] = final_rot.as_euler("xyz", degrees=True)
 
+                    # Grasp does not work.
                     action = np.concatenate([target_pose, [grasp]])
 
                     exec_timestamp = t_command_target - time.monotonic() + time.time()
@@ -188,7 +166,6 @@ def main(
                 traceback.print_exc()
             finally:
                 logger.info("Exiting main loop. Cleaning up...")
-                # Stop recording if still active
                 if is_recording:
                     try:
                         env.end_episode()
@@ -196,7 +173,6 @@ def main(
                     except:
                         logger.warning("Failed to cleanly stop recording.")
                 
-                # Close OpenCV windows
                 cv2.destroyAllWindows()
 
 
