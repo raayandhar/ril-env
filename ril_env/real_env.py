@@ -1,6 +1,8 @@
 import logging
+import time
 import math
 import numpy as np
+import shutil
 import pathlib
 
 from multiprocessing.managers import SharedMemoryManager
@@ -11,6 +13,7 @@ from ril_env.cv2_util import get_image_transform, optimal_row_cols
 from ril_env.video_recorder import VideoRecorder
 from ril_env.multi_realsense import MultiRealsense
 from ril_env.multi_camera_visualizer import MultiCameraVisualizer
+from ril_env.timestamp_accumulator import TimestampActionAccumulator, TimestampObsAccumulator
 from typing import Tuple, List, Optional, Dict, Union
 
 logging.basicConfig(level=logging.INFO)
@@ -191,7 +194,7 @@ class RealEnv:
         self.action_accumulator = None
         self.stage_accumulator = None
 
-        self.start_time
+        self.start_time = None
 
     # Start-stop API
     @property
@@ -209,10 +212,10 @@ class RealEnv:
             self.multi_cam_vis.start(wait=False)
 
     def stop(self, wait=True):
-        # self.end_episode()
+        self.end_episode()
         if wait:
             self.realsense.stop(wait=True)
-            self.robot.start(wait=True)
+            self.robot.stop(wait=True)
         else:
             self.realsense.stop(wait=False)
             self.robot.stop(wait=False)
@@ -224,7 +227,7 @@ class RealEnv:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.top()
+        self.stop()
 
     # Async env API
     def get_obs(self) -> Dict:
@@ -238,12 +241,16 @@ class RealEnv:
         last_robot_data = self.robot.get_all_state()
 
         dt = 1 / self.frequency
-        last_timestamp = np.max([x['timestamp'][-1] for x in self.last_realsense_data.values()])
-        obs_align_timestamps = last_timestamp - (np.arange(self.num_obs_steps)[::-1] * dt)
+        last_timestamp = np.max(
+            [x["timestamp"][-1] for x in self.last_realsense_data.values()]
+        )
+        obs_align_timestamps = last_timestamp - (
+            np.arange(self.num_obs_steps)[::-1] * dt
+        )
 
         camera_obs = dict()
         for camera_idx, value in self.last_realsense_data.items():
-            this_timestamps = value['timestamp']
+            this_timestamps = value["timestamp"]
             this_idxs = list()
             for t in obs_align_timestamps:
                 is_before_idxs = np.nonzero(this_timestamps < t)[0]
@@ -252,4 +259,152 @@ class RealEnv:
                     this_idx = is_before_idxs[-1]
                 this_idxs.append(this_idx)
 
-            camera_obs[f'camera_{camera_idx}'] = value['color'][this_idxs]
+            camera_obs[f"camera_{camera_idx}"] = value["color"][this_idxs]
+
+        robot_timestamps = last_robot_data["robot_receive_timestamp"]
+        this_timestamps = robot_timestamps
+        this_idxs = list()
+        for t in obs_align_timestamps:
+            is_before_idxs = np.nonzero(this_timestamps < t)[0]
+            this_idx = 0
+            if len(is_before_idxs) > 0:
+                this_idx = is_before_idxs[-1]
+            this_idxs.append(this_idx)
+
+        robot_obs_raw = dict()
+        for k, v in last_robot_data.items():
+            if k in self.obs_key_map:
+                robot_obs_raw[self.obs_key_map[k]] = v
+
+        robot_obs = dict()
+        for k, v in robot_obs_raw.items():
+            robot_obs[k] = v[this_idxs]
+
+        # Accumulate observations
+        if self.obs_accumulator is not None:
+            self.obs_accumulator.put(robot_obs_raw, robot_timestamps)
+
+        obs_data = dict(camera_obs)
+        obs_data.update(robot_obs)
+        obs_data["timestamp"] = obs_align_timestamps
+        return obs_data
+
+    def exec_actions(
+        self,
+        actions: np.ndarray,
+        timestamps: np.ndarray,
+        stages: Optional[np.ndarray] = None,
+    ):
+        print(f"In exec_actions: {actions}")
+        assert self.is_ready
+        if not isinstance(actions, np.ndarray):
+            actions = np.array(actions)
+        if not isinstance(timestamps, np.ndarray):
+            timestamps = np.array(timestamps)
+        if stages is None:
+            stages = np.zeros_like(timestamps, dtype=np.int64)
+        elif not isinstance(stages, np.ndarray):
+            stages = np.array(stages, dtype=np.int64)
+
+        receive_time = time.time()
+        is_new = timestamps > receive_time
+        new_actions= actions[is_new]
+        new_timestamps = timestamps[is_new]
+        new_stages = stages[is_new]
+
+        print(f"New actions: {new_actions}")
+        for i in range(len(new_actions)):
+            new_action = new_actions[i]
+            print(f"In for loop: {new_action}")            
+            pose = new_action[:6]
+            grasp = new_action[-1]
+            # Should we have a target timestamp?
+            self.robot.step(pose, grasp)
+
+        if self.action_accumulator is not None:
+            self.action_accumulator.put(
+                new_actions,
+                new_timestamps,
+            )
+
+        if self.stage_accumulator is not None:
+            self.stage_accumulator.put(
+                new_stages,
+                new_timestamps,
+            )
+
+    def get_robot_state(self):
+        return self.robot.get_state()
+
+    def start_episode(self, start_time=None):
+        if start_time is None:
+            start_time = time.time()
+        self.start_time = start_time
+
+        assert self.is_ready
+
+        episode_id = self.replay_buffer.n_episodes
+        this_video_dir = self.video_dir.joinpath(str(episode_id))
+        this_video_dir.mkdir(parents=True, exist_ok=True)
+        n_cameras = self.realsense.n_cameras
+        video_paths = list()
+        for i in range(n_cameras):
+            video_paths.append(
+                str(this_video_dir.joinpath(f'{i}.mp4').absolute()))
+
+        self.realsense.restart_put(start_time=start_time)
+        self.realsense.start_recording(video_path=video_paths, start_time=start_time)
+
+        self.obs_accumulator = TimestampObsAccumulator(
+            start_time=start_time,
+            dt=1/self.frequency,
+        )
+        self.action_accumulator = TimestampActionAccumulator(
+            start_time=start_time,
+            dt=1/self.frequency,
+        )
+        self.stage_accumulator = TimestampActionAccumulator(
+            start_time=start_time,
+            dt=1/self.frequency,
+        )
+        print(f'Episode {episode_id} started!')
+
+    def end_episode(self):
+        assert self.is_ready
+
+        self.realsense.stop_recording()
+
+        if self.obs_accumulator is not None:
+            assert self.action_accumulator is not None
+            assert self.stage_accumulator is not None
+
+            obs_data = self.obs_accumulator.data
+            obs_timestamps = self.obs_accumulator.timestamps
+
+            actions = self.action_accumulator.actions
+            action_timestamps = self.action_accumulator.timestamps
+            stages = self.stage_accumulator.actions
+            n_steps = min(len(obs_timestamps), len(action_timestamps))
+            if n_steps > 0:
+                episode = dict()
+                episode['timestamp'] = obs_timestamps[:n_steps]
+                episode['action'] = actions[:n_steps]
+                episode['stage'] = stages[:n_steps]
+                for key, value in obs_data.items():
+                    episode[key] = value[:n_steps]
+                self.replay_buffer.add_episode(episode, compressors='disk')
+                episode_id = self.replay_buffer.n_episodes - 1
+                print(f'Episode {episode_id} saved!')
+            
+            self.obs_accumulator = None
+            self.action_accumulator = None
+            self.stage_accumulator = None
+
+    def drop_episode(self):
+        self.end_episode()
+        self.replay_buffer.drop_episode()
+        episode_id = self.replay_buffer.n_episodes
+        this_video_dir = self.video_dir.joinpath(str(episode_id))
+        if this_video_dir.exists():
+            shutil.rmtree(str(this_video_dir))
+        print(f'Episode {episode_id} dropped!')
