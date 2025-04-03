@@ -389,6 +389,21 @@ class XArmController(mp.Process):
     def get_all_state(self):
         return self.ring_buffer.get_all()
 
+    def step(self, pose, grasp):
+        assert self.is_alive()
+        pose = np.array(pose)
+        assert pose.shape == (6,)
+
+        cmd = {
+            'cmd': Command.STEP.value,
+            'target_pose': pose,
+            'grasp': grasp,
+            'duration': 0.02,
+            'target_time': time.time() + 0.02,
+        }
+
+        self.input_queue.put(cmd)
+        
     def run(self):
         try:
             logger.info(f"[XArmController] Connecting to xArm at {self.robot_ip}")
