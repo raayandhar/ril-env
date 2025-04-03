@@ -38,78 +38,20 @@ from ril_env.real_env import RealEnv
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
-@click.command()
-@click.option(
-    "--output", "-o", default='./recordings/', required=True, help="Directory to save demonstration dataset."
-)
-@click.option(
-    "--robot_ip", "-ri", default="192.168.1.223", required=True, help="xArm's IP address, e.g. 192.168.1.223"
-)
-@click.option(
-    "--vis_camera_idx",
-    default=0,
-    type=int,
-    help="Which RealSense camera index to visualize in the OpenCV window.",
-)
-@click.option(
-    "--init_joints",
-    "-j",
-    is_flag=True,
-    default=False,
-    help="Whether to home the robot on startup.",
-)
-@click.option(
-    "--frequency", "-f", default=10, type=float, help="Control frequency in Hz."
-)
-@click.option(
-    "--command_latency",
-    "-cl",
-    default=0.01,
-    type=float,
-    help="Latency between receiving SpaceMouse command and sending it to the robot, in seconds.",
-)
-@click.option(
-    "--record_res",
-    default=(1280, 720),
-    type=(int, int),
-    help="Resolution for recording, format: WIDTH HEIGHT"
-)
-@click.option(
-    "--spacemouse_deadzone",
-    default=0.05,
-    type=float,
-    help="Deadzone for the SpaceMouse input",
-)
-@click.option(
-    "--position_gain",
-    default=5.0,
-    type=float,
-    help="Scaling factor for position control",
-)
-@click.option(
-    "--orientation_gain",
-    default=10.0,
-    type=float,
-    help="Scaling factor for orientation control",
-)
 def main(
-    output, 
-    robot_ip, 
-    vis_camera_idx, 
-    init_joints, 
-    frequency, 
-    command_latency,
-    record_res,
-    spacemouse_deadzone,
-    position_gain,
-    orientation_gain
+    output="./recordings/", 
+    vis_camera_idx=0, 
+    init_joints=True, 
+    frequency=10, 
+    command_latency=0.01,
+    record_res=(1280,720),
+    spacemouse_deadzone=0.05,
 ):
     dt = 1.0 / frequency
     output_dir = pathlib.Path(output)
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    xarm_config = XArmConfig(robot_ip=robot_ip)
+    xarm_config = XArmConfig()
 
     with SharedMemoryManager() as shm_manager:
         with KeystrokeCounter() as key_counter, Spacemouse(
@@ -133,35 +75,34 @@ def main(
             multi_cam_vis_resolution=(1280, 720),
             shm_manager=shm_manager,
         ) as env:
-            print("\n\n HERE1!! \n\n")
             logger.info("Configuring camera settings...")
             env.realsense.set_exposure(exposure=120, gain=0)
             env.realsense.set_white_balance(white_balance=5900)
-            print("\n\n HERE2!! \n\n")
+            
             time.sleep(1)
             logger.info("System initialized")
-            print("\n\n HERE3!! \n\n")
+
             state = env.get_robot_state()
             target_pose = np.array(state["TCPPose"], dtype=np.float32)
             logger.info(f"Initial pose: {target_pose}")
-            print("\n\n HERE4!! \n\n")
+
             t_start = time.monotonic()
             iter_idx = 0
             stop = False
             is_recording = False
-            print("\n\n HERE5!! \n\n")
+
             try:
                 logger.info("Starting main control loop...")
                 while not stop:
-                    print("\n\n HERE6!! \n\n")
+
                     t_cycle_end = t_start + (iter_idx + 1) * dt
                     t_command_target = t_cycle_end + dt
                     t_sample = t_cycle_end - command_latency
-                    print("\n\n HERE7!! \n\n")
+
                     obs = env.get_obs()
-                    print("\n\n HERE8!! \n\n")
+
                     press_events = key_counter.get_press_events()
-                    print("\n\n HERE9!! \n\n")
+
                     for key_stroke in press_events:
                         if key_stroke == KeyCode(char="q"):
                             # Exit program
