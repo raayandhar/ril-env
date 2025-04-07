@@ -13,7 +13,10 @@ from ril_env.cv2_util import get_image_transform, optimal_row_cols
 from ril_env.video_recorder import VideoRecorder
 from ril_env.multi_realsense import MultiRealsense
 from ril_env.multi_camera_visualizer import MultiCameraVisualizer
-from ril_env.timestamp_accumulator import TimestampActionAccumulator, TimestampObsAccumulator
+from ril_env.timestamp_accumulator import (
+    TimestampActionAccumulator,
+    TimestampObsAccumulator,
+)
 from typing import Tuple, List, Optional, Dict, Union
 
 logging.basicConfig(level=logging.INFO)
@@ -308,14 +311,14 @@ class RealEnv:
 
         receive_time = time.time()
         is_new = timestamps > receive_time
-        new_actions= actions[is_new]
+        new_actions = actions[is_new]
         new_timestamps = timestamps[is_new]
         new_stages = stages[is_new]
 
         print(f"New actions: {new_actions}")
         for i in range(len(new_actions)):
             new_action = new_actions[i]
-            print(f"In for loop: {new_action}")            
+            print(f"In for loop: {new_action}")
             pose = new_action[:6]
             grasp = new_action[-1]
             # Should we have a target timestamp?
@@ -349,25 +352,24 @@ class RealEnv:
         n_cameras = self.realsense.n_cameras
         video_paths = list()
         for i in range(n_cameras):
-            video_paths.append(
-                str(this_video_dir.joinpath(f'{i}.mp4').absolute()))
+            video_paths.append(str(this_video_dir.joinpath(f"{i}.mp4").absolute()))
 
         self.realsense.restart_put(start_time=start_time)
         self.realsense.start_recording(video_path=video_paths, start_time=start_time)
 
         self.obs_accumulator = TimestampObsAccumulator(
             start_time=start_time,
-            dt=1/self.frequency,
+            dt=1 / self.frequency,
         )
         self.action_accumulator = TimestampActionAccumulator(
             start_time=start_time,
-            dt=1/self.frequency,
+            dt=1 / self.frequency,
         )
         self.stage_accumulator = TimestampActionAccumulator(
             start_time=start_time,
-            dt=1/self.frequency,
+            dt=1 / self.frequency,
         )
-        print(f'Episode {episode_id} started!')
+        print(f"Episode {episode_id} started!")
 
     def end_episode(self):
         assert self.is_ready
@@ -387,15 +389,15 @@ class RealEnv:
             n_steps = min(len(obs_timestamps), len(action_timestamps))
             if n_steps > 0:
                 episode = dict()
-                episode['timestamp'] = obs_timestamps[:n_steps]
-                episode['action'] = actions[:n_steps]
-                episode['stage'] = stages[:n_steps]
+                episode["timestamp"] = obs_timestamps[:n_steps]
+                episode["action"] = actions[:n_steps]
+                episode["stage"] = stages[:n_steps]
                 for key, value in obs_data.items():
                     episode[key] = value[:n_steps]
-                self.replay_buffer.add_episode(episode, compressors='disk')
+                self.replay_buffer.add_episode(episode, compressors="disk")
                 episode_id = self.replay_buffer.n_episodes - 1
-                print(f'Episode {episode_id} saved!')
-            
+                print(f"Episode {episode_id} saved!")
+
             self.obs_accumulator = None
             self.action_accumulator = None
             self.stage_accumulator = None
@@ -407,4 +409,4 @@ class RealEnv:
         this_video_dir = self.video_dir.joinpath(str(episode_id))
         if this_video_dir.exists():
             shutil.rmtree(str(this_video_dir))
-        print(f'Episode {episode_id} dropped!')
+        print(f"Episode {episode_id} dropped!")

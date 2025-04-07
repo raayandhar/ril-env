@@ -18,25 +18,34 @@ from ril_env.real_env import RealEnv
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+"""
+TODO:
+- Actually check that we are recording things
+- Fix the camera visualization
+- Fix the spacemouse-robot weird movement problem
+- Clean up the code, add some documentation
+- Demonstrations!
+"""
+
+
 def main(
-    output="./recordings/", 
-    vis_camera_idx=0, 
-    init_joints=True, # Not used ATM
-    frequency=10, # Cannot increase frequency
+    output="./recordings/",
+    vis_camera_idx=0,
+    init_joints=True,  # Not used ATM
+    frequency=10,  # Cannot increase frequency
     command_latency=0.01,
-    record_res=(1280,720),
+    record_res=(1280, 720),
     spacemouse_deadzone=0.05,
 ):
     dt = 1.0 / frequency
     output_dir = pathlib.Path(output)
     output_dir.mkdir(parents=True, exist_ok=True)
-    
+
     xarm_config = XArmConfig()
 
     with SharedMemoryManager() as shm_manager:
         with KeystrokeCounter() as key_counter, Spacemouse(
-            deadzone=spacemouse_deadzone,
-            shm_manager=shm_manager
+            deadzone=spacemouse_deadzone, shm_manager=shm_manager
         ) as sm, RealEnv(
             output_dir=output_dir,
             xarm_config=xarm_config,
@@ -51,14 +60,14 @@ def main(
             record_raw_video=True,
             thread_per_video=3,
             video_crf=21,
-            enable_multi_cam_vis=False, # Totally broken RN
+            enable_multi_cam_vis=False,  # Totally broken RN
             multi_cam_vis_resolution=(1280, 720),
             shm_manager=shm_manager,
         ) as env:
             logger.info("Configuring camera settings...")
             env.realsense.set_exposure(exposure=120, gain=0)
             env.realsense.set_white_balance(white_balance=5900)
-            
+
             time.sleep(1)
             logger.info("System initialized")
 
@@ -100,7 +109,9 @@ def main(
                             is_recording = False
                             logger.info("Recording stopped.")
                         elif key_stroke == Key.backspace:
-                            if click.confirm("Drop the most recently recorded episode?"):
+                            if click.confirm(
+                                "Drop the most recently recorded episode?"
+                            ):
                                 env.drop_episode()
                                 is_recording = False
                                 logger.info("Episode dropped.")
@@ -136,25 +147,35 @@ def main(
                     drot = sm_state[3:]
                     grasp = sm.grasp
 
-                    dpos *= xarm_config.position_gain
-                    drot *= xarm_config.orientation_gain
+                    input_magnitude = np.linalg.norm(dpos) + np.linalg.norm(drot)
+                    significant_movement = input_magnitude > spacemouse_deadzone * 2.0
+                    if significant_movement:
+                        dpos *= xarm_config.position_gain
+                        drot *= xarm_config.orientation_gain
 
-                    curr_rot = st.Rotation.from_euler("xyz", target_pose[3:], degrees=True)
-                    delta_rot = st.Rotation.from_euler("xyz", drot, degrees=True)
-                    final_rot = delta_rot * curr_rot
-                    
-                    target_pose[:3] += dpos
-                    target_pose[3:] = final_rot.as_euler("xyz", degrees=True)
+                        curr_rot = st.Rotation.from_euler(
+                            "xyz", target_pose[3:], degrees=True
+                        )
+                        delta_rot = st.Rotation.from_euler("xyz", drot, degrees=True)
+                        final_rot = delta_rot * curr_rot
 
-                    # Grasp does not work.
-                    action = np.concatenate([target_pose, [grasp]])
+                        target_pose[:3] += dpos
+                        target_pose[3:] = final_rot.as_euler("xyz", degrees=True)
 
-                    exec_timestamp = t_command_target - time.monotonic() + time.time()
-                    env.exec_actions(
-                        actions=[action],
-                        timestamps=[exec_timestamp],
-                        stages=[stage_val],
-                    )
+                        # Grasp does not work.
+                        action = np.concatenate([target_pose, [grasp]])
+
+                        exec_timestamp = (
+                            t_command_target - time.monotonic() + time.time()
+                        )
+                        env.exec_actions(
+                            actions=[action],
+                            timestamps=[exec_timestamp],
+                            stages=[stage_val],
+                        )
+                        logger.debug("Significant movement detected, executing action.")
+                    else:
+                        logger.debug("No significant movement detected.")
 
                     precise_wait(t_cycle_end)
                     iter_idx += 1
@@ -172,7 +193,7 @@ def main(
                         logger.info("Recording stopped during cleanup.")
                     except:
                         logger.warning("Failed to cleanly stop recording.")
-                
+
                 cv2.destroyAllWindows()
 
 
