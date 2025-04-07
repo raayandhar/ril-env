@@ -395,15 +395,15 @@ class XArmController(mp.Process):
         assert pose.shape == (6,)
 
         cmd = {
-            'cmd': Command.STEP.value,
-            'target_pose': pose,
-            'grasp': grasp,
-            'duration': 0.02,
-            'target_time': time.time() + 0.02,
+            "cmd": Command.STEP.value,
+            "target_pose": pose,
+            "grasp": grasp,
+            "duration": 0.02,
+            "target_time": time.time() + 0.02,
         }
 
         self.input_queue.put(cmd)
-        
+
     def run(self):
         try:
             logger.info(f"[XArmController] Connecting to xArm at {self.robot_ip}")
