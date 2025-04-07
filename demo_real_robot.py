@@ -32,7 +32,7 @@ def main(
     output="./recordings/",
     vis_camera_idx=0,
     init_joints=True,  # Not used ATM
-    frequency=10,  # Cannot increase frequency
+    frequency=30,  # Cannot increase frequency
     command_latency=0.01,
     record_res=(1280, 720),
     spacemouse_deadzone=0.05,
@@ -148,7 +148,7 @@ def main(
                     grasp = sm.grasp
 
                     input_magnitude = np.linalg.norm(dpos) + np.linalg.norm(drot)
-                    significant_movement = input_magnitude > spacemouse_deadzone * 2.0
+                    significant_movement = input_magnitude > spacemouse_deadzone * 8.0
                     if significant_movement:
                         dpos *= xarm_config.position_gain
                         drot *= xarm_config.orientation_gain
@@ -175,6 +175,15 @@ def main(
                         )
                         logger.debug("Significant movement detected, executing action.")
                     else:
+                        action = np.concatenate([target_pose, [grasp]])
+                        exec_timestamp = (
+                            t_command_target - time.monotonic() + time.time()
+                        )
+                        env.exec_actions(
+                            actions=[action],
+                            timestamps=[exec_timestamp],
+                            stages=[stage_val],
+                        )
                         logger.debug("No significant movement detected.")
 
                     precise_wait(t_cycle_end)
