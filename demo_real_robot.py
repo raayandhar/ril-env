@@ -90,7 +90,8 @@ def main(
 
                     # Pump obs
                     obs = env.get_obs()
-                    print("OBS: ", obs)
+                    # Let's get camera data as well.
+                    # print(obs)
 
                     press_events = key_counter.get_press_events()
 
