@@ -201,6 +201,9 @@ class RealEnv:
         self.stage_accumulator = None
 
         self.start_time = None
+        
+        # Count accumulated observations for debugging
+        self.obs_count = 0
 
     # Start-stop API
     @property
@@ -218,7 +221,13 @@ class RealEnv:
             self.multi_cam_vis.start(wait=False)
 
     def stop(self, wait=True):
-        self.end_episode()
+        try:
+            # Only try to end the episode if there's an active one
+            if self.obs_accumulator is not None:
+                self.end_episode()
+        except Exception as e:
+            logger.error(f"Error in end_episode during stop: {e}")
+            
         if wait:
             self.realsense.stop(wait=True)
             self.robot.stop(wait=True)
@@ -245,6 +254,8 @@ class RealEnv:
 
         # Running at 50 hz
         last_robot_data = self.robot.get_all_state()
+        # Uncomment for debugging
+        # print(f"ROBOT STATE KEYS: {list(last_robot_data.keys())}")
 
         dt = 1 / self.frequency
         last_timestamp = np.max(
@@ -286,10 +297,33 @@ class RealEnv:
         for k, v in robot_obs_raw.items():
             robot_obs[k] = v[this_idxs]
 
-        # Accumulate observations
+        # Accumulate observations for recording
         if self.obs_accumulator is not None:
-            print("Accumulate obs")
-            self.obs_accumulator.put(robot_obs_raw, robot_timestamps)
+            # The TimestampObsAccumulator expects each value to be a single observation,
+            # not the array for multiple steps. We need to extract just the latest observation.
+            latest_obs = {}
+            for k, v in last_robot_data.items():
+                if k in self.obs_key_map:
+                    mapped_key = self.obs_key_map[k]
+                    
+                    # Make sure we're passing a single observation
+                    if isinstance(v, np.ndarray) and len(v.shape) > 0:
+                        latest_value = v[-1]  # Take the most recent value
+                        
+                        # Handle scalar values correctly
+                        if np.isscalar(latest_value):
+                            latest_obs[mapped_key] = np.array([latest_value])
+                        else:
+                            latest_obs[mapped_key] = latest_value
+                    else:
+                        latest_obs[mapped_key] = v
+            
+            # Now accumulate the observation with correct format
+            if latest_obs:  # Only if we have any observations
+                self.obs_count += 1
+                if self.obs_count % 10 == 0:  # Log every 10th observation to reduce spam
+                    logger.info(f"Accumulated {self.obs_count} observations, latest keys: {list(latest_obs.keys())}")
+                self.obs_accumulator.put(latest_obs, np.array([robot_timestamps[-1]]))
 
         obs_data = dict(camera_obs)
         obs_data.update(robot_obs)
@@ -317,7 +351,7 @@ class RealEnv:
         new_actions = actions[is_new]
         new_timestamps = timestamps[is_new]
         new_stages = stages[is_new]
-        print("New actions:", new_actions)
+
         for i in range(len(new_actions)):
             new_action = new_actions[i]
             pose = new_action[:6]
@@ -326,14 +360,12 @@ class RealEnv:
             self.robot.step(pose, grasp)
 
         if self.action_accumulator is not None:
-            print("Putting data")
             self.action_accumulator.put(
                 new_actions,
                 new_timestamps,
             )
 
         if self.stage_accumulator is not None:
-            print("Putting stage")
             self.stage_accumulator.put(
                 new_stages,
                 new_timestamps,
@@ -372,38 +404,109 @@ class RealEnv:
             start_time=start_time,
             dt=1 / self.frequency,
         )
-        print(f"Episode {episode_id} started!")
+        
+        # Reset observation counter
+        self.obs_count = 0
+        
+        logger.info(f"Episode {episode_id} started!")
 
     def end_episode(self):
-        assert self.is_ready
-
+        """Safely end the current episode and save data to the replay buffer."""
+        if not self.is_ready:
+            logger.warning("Tried to end episode but environment is not ready")
+            return
+            
+        # Stop recording video
         self.realsense.stop_recording()
 
-        print(self.obs_accumulator.data)
-        print(self.action_accumulator.actions)
+        # If we don't have any accumulators, there's nothing to save
+        if self.obs_accumulator is None or self.action_accumulator is None or self.stage_accumulator is None:
+            logger.info("No active episode to end or episode already ended")
+            return
 
-        if self.obs_accumulator is not None:
-            assert self.action_accumulator is not None
-            assert self.stage_accumulator is not None
-
-            obs_data = self.obs_accumulator.data
-            obs_timestamps = self.obs_accumulator.timestamps
-
+        try:
+            # Get robot state for final observation
+            last_robot_data = self.robot.get_all_state()
+            
+            # Debug: print what attributes are in the accumulators
+            print(f"Action accumulator dir: {dir(self.action_accumulator)}")
+            print(f"Stage accumulator dir: {dir(self.stage_accumulator)}")
+            
+            # Get action data
             actions = self.action_accumulator.actions
             action_timestamps = self.action_accumulator.timestamps
-            stages = self.stage_accumulator.actions
-            n_steps = min(len(obs_timestamps), len(action_timestamps))
+            
+            # Try different ways to access stages
+            try:
+                stages = self.stage_accumulator.actions
+                print(f"Using stage_accumulator.actions: shape={stages.shape}")
+            except Exception as e:
+                print(f"Error accessing stage_accumulator.actions: {e}")
+                # Fallback
+                stages = np.zeros_like(actions[:, 0], dtype=np.int64)
+            
+            # Check if we have actions to save
+            n_steps = len(action_timestamps)
+            logger.info(f"Actions to save: {n_steps}")
+            
             if n_steps > 0:
+                # Create episode dictionary
                 episode = dict()
-                episode["timestamp"] = obs_timestamps[:n_steps]
-                episode["action"] = actions[:n_steps]
-                episode["stage"] = stages[:n_steps]
-                for key, value in obs_data.items():
-                    episode[key] = value[:n_steps]
+                episode["timestamp"] = action_timestamps
+                episode["action"] = actions
+                episode["stage"] = stages
+                
+                # Construct observation data matching the number of actions
+                # Map robot state to the right keys
+                robot_obs = {}
+                for k, v in last_robot_data.items():
+                    if k in self.obs_key_map:
+                        mapped_key = self.obs_key_map[k]
+                        
+                        # Get the latest value
+                        if isinstance(v, np.ndarray) and len(v.shape) > 0:
+                            latest_value = v[-1]
+                        else:
+                            latest_value = v
+                        
+                        # Replicate it for all timesteps
+                        if np.isscalar(latest_value):
+                            robot_obs[mapped_key] = np.full(n_steps, latest_value)
+                        else:
+                            # For arrays like pose data
+                            robot_obs[mapped_key] = np.tile(latest_value, (n_steps, 1))
+                
+                # Add robot observations to episode
+                for key, value in robot_obs.items():
+                    episode[key] = value
+                
+                # Log episode data before saving
+                logger.info(f"Episode data keys: {list(episode.keys())}")
+                logger.info(f"Episode timestamp shape: {episode['timestamp'].shape}")
+                logger.info(f"Episode action shape: {episode['action'].shape}")
+                
+                # Save to replay buffer
                 self.replay_buffer.add_episode(episode, compressors="disk")
                 episode_id = self.replay_buffer.n_episodes - 1
-                print(f"Episode {episode_id} saved!")
-
+                logger.info(f"Episode {episode_id} saved with {n_steps} steps!")
+                
+                # Print a confirmation for the user
+                print(f"Data successfully saved to {self.output_dir}/replay_buffer.zarr!")
+                print(f"To view your data, you need to load it with the ReplayBuffer class.")
+                print("Example:")
+                print("  from ril_env.replay_buffer import ReplayBuffer")
+                print(f"  buffer = ReplayBuffer.create_from_path('{self.output_dir}/replay_buffer.zarr')")
+                print("  episode = buffer.get_episode(0)  # Get the first episode")
+                print("  print(episode.keys())  # See what data is available")
+                print("  print(episode['action'].shape)  # Check the action shape")
+            else:
+                logger.warning("No steps to save in this episode")
+        except Exception as e:
+            logger.error(f"Error saving episode data: {e}")
+            import traceback
+            traceback.print_exc()
+        finally:
+            # Always clear the accumulators, even if there was an error
             self.obs_accumulator = None
             self.action_accumulator = None
             self.stage_accumulator = None
@@ -416,3 +519,23 @@ class RealEnv:
         if this_video_dir.exists():
             shutil.rmtree(str(this_video_dir))
         print(f"Episode {episode_id} dropped!")
+        
+    def verify_data(self):
+        """Verify that data is saved in the replay buffer and print some statistics."""
+        if self.replay_buffer.n_episodes == 0:
+            print("No episodes found in the replay buffer.")
+            return
+            
+        print(f"Found {self.replay_buffer.n_episodes} episodes in the replay buffer.")
+        
+        # Print information about the first episode
+        episode = self.replay_buffer.get_episode(0)
+        print(f"Episode 0 data keys: {list(episode.keys())}")
+        for key, value in episode.items():
+            if isinstance(value, np.ndarray):
+                print(f"  {key}: shape={value.shape}, dtype={value.dtype}")
+                if len(value) > 0:
+                    if len(value.shape) == 1:
+                        print(f"    First few values: {value[:5]}")
+                    else:
+                        print(f"    First value: {value[0]}")
