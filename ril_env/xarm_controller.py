@@ -31,7 +31,7 @@ class XArmConfig:
     home_pos: List[int] = field(default_factory=lambda: [0, 0, 0, 70, 0, 70, 0])
     home_speed: float = 50.0
     tcp_maxacc: int = 5000
-    verbose: bool = True
+    verbose: bool = False # switch off
 
 
 class XArm:
@@ -451,7 +451,6 @@ class XArmController(mp.Process):
                 for i in range(n_cmd):
                     command = {key: commands[key][i] for key in commands}
                     cmd = command["cmd"]
-                    print(cmd)
                     if cmd == Command.STOP.value:
                         logger.debug("[XArmController] Received STOP command.")
                         self.stop_event.set()

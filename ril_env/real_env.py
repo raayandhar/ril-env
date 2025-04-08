@@ -23,11 +23,14 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 DEFAULT_OBS_KEY_MAP = {
-    # Robot
-    "ActualTCPPose": "robot_eef_pose",
-    "ActualTCPSpeed": "robot_eef_pose_vel",
-    "ActualQ": "robot_joint",
-    "ActualQd": "robot_joint_vel",
+    # Robot - using the correct key names that match XArmController.get_all_state()
+    "TCPPose": "robot_eef_pose",
+    "TCPSpeed": "robot_eef_pose_vel",
+    "JointAngles": "robot_joint",
+    "JointSpeeds": "robot_joint_vel",
+    # Additional keys if they exist
+    "Grasp": "robot_gripper",
+    "robot_receive_timestamp": "robot_timestamp",
     # Timestamps
     "step_idx": "step_idx",
     "timestamp": "timestamp",
@@ -159,7 +162,7 @@ class RealEnv:
             vis_transform=vis_transform,
             recording_transform=recording_transform,
             video_recorder=video_recorder,
-            verbose=True,
+            verbose=False,
         )
 
         multi_cam_vis = None
@@ -285,6 +288,7 @@ class RealEnv:
 
         # Accumulate observations
         if self.obs_accumulator is not None:
+            print("Accumulate obs")
             self.obs_accumulator.put(robot_obs_raw, robot_timestamps)
 
         obs_data = dict(camera_obs)
@@ -298,7 +302,6 @@ class RealEnv:
         timestamps: np.ndarray,
         stages: Optional[np.ndarray] = None,
     ):
-        print(f"In exec_actions: {actions}")
         assert self.is_ready
         if not isinstance(actions, np.ndarray):
             actions = np.array(actions)
@@ -314,23 +317,23 @@ class RealEnv:
         new_actions = actions[is_new]
         new_timestamps = timestamps[is_new]
         new_stages = stages[is_new]
-
-        print(f"New actions: {new_actions}")
+        print("New actions:", new_actions)
         for i in range(len(new_actions)):
             new_action = new_actions[i]
-            print(f"In for loop: {new_action}")
             pose = new_action[:6]
             grasp = new_action[-1]
             # Should we have a target timestamp?
             self.robot.step(pose, grasp)
 
         if self.action_accumulator is not None:
+            print("Putting data")
             self.action_accumulator.put(
                 new_actions,
                 new_timestamps,
             )
 
         if self.stage_accumulator is not None:
+            print("Putting stage")
             self.stage_accumulator.put(
                 new_stages,
                 new_timestamps,
@@ -375,6 +378,9 @@ class RealEnv:
         assert self.is_ready
 
         self.realsense.stop_recording()
+
+        print(self.obs_accumulator.data)
+        print(self.action_accumulator.actions)
 
         if self.obs_accumulator is not None:
             assert self.action_accumulator is not None

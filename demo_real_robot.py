@@ -88,13 +88,11 @@ def main(
                     t_command_target = t_cycle_end + dt
                     t_sample = t_cycle_end - command_latency
 
+                    # Pump obs
                     obs = env.get_obs()
+                    print("OBS: ", obs)
 
                     press_events = key_counter.get_press_events()
-
-                    # Just force start:
-                    env.start_episode()
-                    is_recording = True
 
                     for key_stroke in press_events:
                         if key_stroke == KeyCode(char="q"):
@@ -196,14 +194,6 @@ def main(
                 traceback.print_exc()
             finally:
                 logger.info("Exiting main loop. Cleaning up...")
-                if is_recording:
-                    try:
-                        env.end_episode()
-                        logger.info("Recording stopped during cleanup.")
-                    except:
-                        logger.warning("Failed to cleanly stop recording.")
-
-                cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":
