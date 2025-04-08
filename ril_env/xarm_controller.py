@@ -31,7 +31,7 @@ class XArmConfig:
     home_pos: List[int] = field(default_factory=lambda: [0, 0, 0, 70, 0, 70, 0])
     home_speed: float = 50.0
     tcp_maxacc: int = 5000
-    verbose: bool = False # switch off
+    verbose: bool = False  # switch off
 
 
 class XArm:
