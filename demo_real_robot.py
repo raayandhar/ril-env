@@ -92,7 +92,7 @@ def main(
                     obs = env.get_obs()
                     # Let's get camera data as well.
                     # Should find out what the obs dict is doing.
-                    print(obs)
+                    # print(obs)
 
                     press_events = key_counter.get_press_events()
 
