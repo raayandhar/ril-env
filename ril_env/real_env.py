@@ -31,6 +31,10 @@ DEFAULT_OBS_KEY_MAP = {
     # Additional keys if they exist
     "Grasp": "robot_gripper",
     "robot_receive_timestamp": "robot_timestamp",
+    # Camera stuff,
+    "Camera_0": "camera_0",
+    "Camera_1": "camera_1",
+    "Camera_2": "camera_2",
     # Timestamps
     "step_idx": "step_idx",
     "timestamp": "timestamp",
@@ -288,8 +292,27 @@ class RealEnv:
 
         # Accumulate observations
         if self.obs_accumulator is not None:
-            print("Accumulate obs")
-            self.obs_accumulator.put(robot_obs_raw, robot_timestamps)
+            # Create a complete observation that includes both robot and camera
+            complete_obs = dict()
+            
+            # Add robot observations with original keys
+            for k, v in last_robot_data.items():
+                if k in self.obs_key_map:
+                    complete_obs[k] = v
+            
+            # Add camera observations
+            """
+            for camera_idx, data in self.last_realsense_data.items():
+                camera_key = f"Camera_{camera_idx}"
+                complete_obs[camera_key] = data["color"]
+            """
+            # Create absolute timestamps for accumulation
+            now = time.time()
+            relative_timestamps = robot_timestamps
+            absolute_timestamps = np.array([now + (t - relative_timestamps[0]) for t in relative_timestamps])
+            
+            # Put data in the accumulator
+            self.obs_accumulator.put(complete_obs, absolute_timestamps)
 
         obs_data = dict(camera_obs)
         obs_data.update(robot_obs)
@@ -317,23 +340,23 @@ class RealEnv:
         new_actions = actions[is_new]
         new_timestamps = timestamps[is_new]
         new_stages = stages[is_new]
-        print("New actions:", new_actions)
+        
+        # Execute robot actions
         for i in range(len(new_actions)):
             new_action = new_actions[i]
             pose = new_action[:6]
             grasp = new_action[-1]
-            # Should we have a target timestamp?
             self.robot.step(pose, grasp)
 
+        # Record actions if recording
         if self.action_accumulator is not None:
-            print("Putting data")
+            # Use the same timestamps for both robot and recordings
             self.action_accumulator.put(
                 new_actions,
                 new_timestamps,
             )
 
         if self.stage_accumulator is not None:
-            print("Putting stage")
             self.stage_accumulator.put(
                 new_stages,
                 new_timestamps,
@@ -345,6 +368,8 @@ class RealEnv:
     def start_episode(self, start_time=None):
         if start_time is None:
             start_time = time.time()
+        
+        # Use absolute timestamps for everything
         self.start_time = start_time
 
         assert self.is_ready
@@ -357,9 +382,11 @@ class RealEnv:
         for i in range(n_cameras):
             video_paths.append(str(this_video_dir.joinpath(f"{i}.mp4").absolute()))
 
+        # Use absolute timestamps for recordings
         self.realsense.restart_put(start_time=start_time)
         self.realsense.start_recording(video_path=video_paths, start_time=start_time)
 
+        # Initialize accumulators with absolute timestamps
         self.obs_accumulator = TimestampObsAccumulator(
             start_time=start_time,
             dt=1 / self.frequency,
@@ -378,9 +405,6 @@ class RealEnv:
         assert self.is_ready
 
         self.realsense.stop_recording()
-
-        print(self.obs_accumulator.data)
-        print(self.action_accumulator.actions)
 
         if self.obs_accumulator is not None:
             assert self.action_accumulator is not None
