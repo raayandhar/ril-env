@@ -12,7 +12,7 @@ from multiprocessing.managers import SharedMemoryManager
 from ril_env.spacemouse import Spacemouse
 from ril_env.keystroke_counter import KeystrokeCounter, Key, KeyCode
 from ril_env.precise_sleep import precise_wait
-from ril_env.xarm_controller import XArmConfig
+from ril_env.xarm_controller import XArmConfig, XArm
 from ril_env.real_env import RealEnv
 
 logging.basicConfig(level=logging.INFO)
@@ -196,7 +196,6 @@ def main(
                 traceback.print_exc()
             finally:
                 logger.info("Exiting main loop. Cleaning up...")
-
 
 if __name__ == "__main__":
     main()
