@@ -120,11 +120,14 @@ class TimestampObsAccumulator:
         data:
             key: T,*
         """
+
+        """
         print("ACCUMULATOR DEBUG:")
         print("Input timestamps:", timestamps[:5], "...")
         print("Start time:", self.start_time)
         print("Input data keys:", list(data.keys()))
         print("Input data shapes:", {k: v.shape for k, v in data.items()})
+        """
 
         local_idxs, global_idxs, self.next_global_idx = get_accumulate_timestamp_idxs(
             timestamps=timestamps,
@@ -134,9 +137,11 @@ class TimestampObsAccumulator:
             next_global_idx=self.next_global_idx,
         )
 
+        """
         print("Local indices:", local_idxs[:5], "...")
         print("Global indices:", global_idxs[:5], "...")
         print("Next global idx:", self.next_global_idx)
+        """
 
         if len(global_idxs) > 0:
             if self.timestamp_buffer is None:
@@ -161,7 +166,7 @@ class TimestampObsAccumulator:
             # write data
             for key, value in self.obs_buffer.items():
                 if key in data:
-                    print(f"Writing data for {key}")
+                    # print(f"Writing data for {key}")
                     value[global_idxs] = data[key][local_idxs]
                 else:
                     print(f"WARNING: Key {key} in obs_buffer but not in input data")
