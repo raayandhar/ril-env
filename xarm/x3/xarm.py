@@ -11,9 +11,7 @@ import re
 import math
 import sys
 import time
-import uuid
 import socket
-import warnings
 from collections.abc import Iterable
 from ..core.config.x_config import XCONF
 from ..core.utils.log import logger
@@ -2851,7 +2849,7 @@ class XArm(Gripper, Servo, Record, RobotIQ, BaseBoard, Track, FtSensor, ModbusTc
                     return err if err != 0 else code
             self.wait_move(set_cnt=5)
             return code
-        except Exception as e:
+        except Exception:
             code = -13
             return code
         finally:

@@ -7,7 +7,6 @@
 # Author: Vinman <vinman.wen@ufactory.cc> <vinman.cub@gmail.com>
 import math
 import time
-import sys
 import traceback
 
 

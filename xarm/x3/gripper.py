@@ -9,7 +9,6 @@
 import time
 import struct
 from ..core.config.x_config import XCONF
-from ..core.utils.log import logger
 from ..core.utils import convert
 from .code import APIState
 from .gpio import GPIO

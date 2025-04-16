@@ -1,11 +1,6 @@
 import numpy as np
 import scipy.linalg
-from mpl_toolkits import mplot3d
-from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
-import numpy as np
-import pprint
-from matplotlib.tri import Triangulation
 
 
 def transform(inpt, T):

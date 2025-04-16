@@ -7,7 +7,6 @@
 # Author: Vinman <vinman.wen@ufactory.cc> <vinman.cub@gmail.com>
 import time
 from ..core.utils.log import logger
-from ..core.utils import convert
 from .base import Base
 from .code import APIState
 from .decorator import xarm_is_connected

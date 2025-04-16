@@ -1,21 +1,12 @@
 import sys
-import pyrealsense2 as rs
-import random
 import pprint
 import numpy as np
 import cv2
-import copy
-from cv2 import aruco
-import imageio
 from rs_streamer import RealsenseStreamer, MarkSearch
-import torch
 import os
-import numpy as np
 
 from scipy.spatial.transform import Rotation as R
-import time
 
-from rs_streamer import RealsenseStreamer, MarkSearch
 from calib_utils.solver import Solver
 
 sys.path.append(
@@ -26,12 +17,7 @@ from xarm import XArmAPI
 from dataclasses import dataclass
 from vision_utils.pc_utils import (
     deproject,
-    deproject_pixels,
     project,
-    transform_points,
-    draw_registration_result,
-    rescale_pcd,
-    align_pcds,
     merge_pcls,
     denoise,
 )
