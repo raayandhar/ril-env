@@ -8,16 +8,12 @@
 
 import time
 import math
-import functools
-from ..core.utils.log import logger
-from .code import APIState
-from ..core.config.x_config import XCONF
 
 
 def compare_time(time1, time2):
     try:
-        s_time = time.mktime(time.strptime(time1, '%Y-%m-%d'))
-        e_time = time.mktime(time.strptime(time2, '%Y-%m-%d'))
+        s_time = time.mktime(time.strptime(time1, "%Y-%m-%d"))
+        e_time = time.mktime(time.strptime(time2, "%Y-%m-%d"))
         return int(s_time) - int(e_time) > 0
     except:
         return False
@@ -40,4 +36,3 @@ def filter_invaild_number(num, ndigits=3, default=0.0):
 
 def to_radian(val, is_radian=False, default=0):
     return default if val is None else float(val) if is_radian else math.radians(val)
-

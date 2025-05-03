@@ -7,7 +7,6 @@
 # Author: Vinman <vinman.wen@ufactory.cc> <vinman.cub@gmail.com>
 import math
 import time
-import sys
 import traceback
 
 
@@ -17,10 +16,13 @@ def pprint(*args, **kwargs):
         # filename = stack_tuple[0]
         linenumber = stack_tuple[1]
         # funcname = stack_tuple[2]
-        print('[{}][line:{}]'.format(
-            time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())),
-            linenumber
-        ), end=' ')
+        print(
+            "[{}][line:{}]".format(
+                time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time())),
+                linenumber,
+            ),
+            end=" ",
+        )
     except:
         pass
     print(*args, **kwargs)
@@ -32,5 +34,5 @@ def is_prime(n):
             if n % (i - 1) == 0 or n % (i + 1) == 0:
                 return False
         return True
-    return n == 2 or n == 3 or (n > 1 and n % 2 != 0 and n % 3 != 0 and _is_prime())
 
+    return n == 2 or n == 3 or (n > 1 and n % 2 != 0 and n % 3 != 0 and _is_prime())

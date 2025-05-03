@@ -8,25 +8,25 @@
 
 import re
 
-GCODE_PARAM_X = 'X'  # TCP-X
-GCODE_PARAM_Y = 'Y'  # TCP-Y
-GCODE_PARAM_Z = 'Z'  # TCP-Z
-GCODE_PARAM_A = 'A'  # TCP-Roll
-GCODE_PARAM_B = 'B'  # TCP-Pitch
-GCODE_PARAM_C = 'C'  # TCP-Yaw
-GCODE_PARAM_R = 'R'  # TCP-Radius
-GCODE_PARAM_I = 'I'  # Joint-1
-GCODE_PARAM_J = 'J'  # Joint-2
-GCODE_PARAM_K = 'K'  # Joint-3
-GCODE_PARAM_L = 'L'  # Joint-4
-GCODE_PARAM_M = 'M'  # Joint-5
-GCODE_PARAM_N = 'N'  # Joint-6
-GCODE_PARAM_O = 'O'  # Joint-7
-GCODE_PARAM_F = 'F'  # Move-Speed
-GCODE_PARAM_Q = 'Q'  # Move-Acc
-GCODE_PARAM_T = 'T'  # Move-Time
-GCODE_PARAM_V = 'V'  # Value
-GCODE_PARAM_D = 'D'  # Addr
+GCODE_PARAM_X = "X"  # TCP-X
+GCODE_PARAM_Y = "Y"  # TCP-Y
+GCODE_PARAM_Z = "Z"  # TCP-Z
+GCODE_PARAM_A = "A"  # TCP-Roll
+GCODE_PARAM_B = "B"  # TCP-Pitch
+GCODE_PARAM_C = "C"  # TCP-Yaw
+GCODE_PARAM_R = "R"  # TCP-Radius
+GCODE_PARAM_I = "I"  # Joint-1
+GCODE_PARAM_J = "J"  # Joint-2
+GCODE_PARAM_K = "K"  # Joint-3
+GCODE_PARAM_L = "L"  # Joint-4
+GCODE_PARAM_M = "M"  # Joint-5
+GCODE_PARAM_N = "N"  # Joint-6
+GCODE_PARAM_O = "O"  # Joint-7
+GCODE_PARAM_F = "F"  # Move-Speed
+GCODE_PARAM_Q = "Q"  # Move-Acc
+GCODE_PARAM_T = "T"  # Move-Time
+GCODE_PARAM_V = "V"  # Value
+GCODE_PARAM_D = "D"  # Addr
 
 
 class GcodeParser:
@@ -36,7 +36,7 @@ class GcodeParser:
 
     @staticmethod
     def __get_value(string, ch, return_type, default=None):
-        pattern = r'{}(\-?\d+\.?\d*)'.format(ch)
+        pattern = r"{}(\-?\d+\.?\d*)".format(ch)
         data = re.findall(pattern, string)
         if len(data) > 0:
             return return_type(data[0])
@@ -44,7 +44,7 @@ class GcodeParser:
 
     @staticmethod
     def __get_hex_value(string, ch, default=None):
-        pattern = r'{}(-?\w{{3,4}})'.format(ch)
+        pattern = r"{}(-?\w{{3,4}})".format(ch)
         data = re.findall(pattern, string)
         if len(data) > 0:
             return int(data[0], base=16)

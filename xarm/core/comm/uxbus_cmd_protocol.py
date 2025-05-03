@@ -25,6 +25,7 @@ class Ux2HexProtocol(object):
     """
     fromid and toid: broadcast address is 0xFF
     """
+
     def __init__(self, rx_que, fromid, toid):
         self.rx_que = rx_que
         self.rxstate = UX2HEX_RXSTART_FROMID
@@ -48,7 +49,7 @@ class Ux2HexProtocol(object):
         if length == 0:
             length = len(rxstr)
         if len(rxstr) < length:
-            logger.error('len(rxstr) < length')
+            logger.error("len(rxstr) < length")
 
         for i in range(length):
             rxch = bytes([rxstr[i]])
@@ -91,10 +92,12 @@ class Ux2HexProtocol(object):
             elif UX2HEX_RXSTATE_CRC2 == self.rxstate:
                 self.rxbuf += rxch
                 self.rxstate = UX2HEX_RXSTART_FROMID
-                crc = crc16.crc_modbus(self.rxbuf[:self.len + 3])
-                if crc[0] == self.rxbuf[self.len + 3] and crc[1] == self.rxbuf[self.len + 4]:
+                crc = crc16.crc_modbus(self.rxbuf[: self.len + 3])
+                if (
+                    crc[0] == self.rxbuf[self.len + 3]
+                    and crc[1] == self.rxbuf[self.len + 4]
+                ):
                     if self.rx_que.full():
                         self.rx_que.get()
                     self.rx_que.put(self.rxbuf)
                     # print(self.rxbuf)
-

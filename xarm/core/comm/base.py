@@ -9,7 +9,6 @@
 import time
 import queue
 import socket
-import select
 import threading
 from ..utils.log import logger
 from ..utils import convert
@@ -44,7 +43,7 @@ class Port(threading.Thread):
         self.rx_parse = RxParse(self.rx_que, self.fb_que)
         self.com_read = None
         self.com_write = None
-        self.port_type = ''
+        self.port_type = ""
         self.buffer_size = 1
         self.heartbeat_thread = None
         self.alive = True
@@ -54,7 +53,7 @@ class Port(threading.Thread):
         return self._connected
 
     def run(self):
-        if self.port_type == 'report-socket':
+        if self.port_type == "report-socket":
             self.recv_report_proc()
         else:
             self.recv_proc()
@@ -62,7 +61,7 @@ class Port(threading.Thread):
 
     def close(self):
         self.alive = False
-        if 'socket' in self.port_type:
+        if "socket" in self.port_type:
             try:
                 self.com.shutdown(socket.SHUT_RDWR)
             except:
@@ -75,7 +74,7 @@ class Port(threading.Thread):
     def flush(self, fromid=-1, toid=-1):
         if not self.connected:
             return -1
-        while not(self.rx_que.empty()):
+        while not (self.rx_que.empty()):
             self.rx_que.queue.clear()
         self.rx_parse.flush(fromid, toid)
         return 0
@@ -85,7 +84,7 @@ class Port(threading.Thread):
             return -1
         try:
             with self.write_lock:
-                logger.verbose('[{}] send: {}'.format(self.port_type, data))
+                logger.verbose("[{}] send: {}".format(self.port_type, data))
                 self.com_write(data)
             return 0
         except Exception as e:
@@ -98,7 +97,7 @@ class Port(threading.Thread):
             return -1
         try:
             buf = self.rx_que.get(timeout=timeout)
-            logger.verbose('[{}] recv: {}'.format(self.port_type, buf))
+            logger.verbose("[{}] recv: {}".format(self.port_type, buf))
             return buf
         except:
             return -1
@@ -137,12 +136,12 @@ class Port(threading.Thread):
 
     def recv_report_proc(self):
         self.alive = True
-        logger.debug('[{}] recv thread start'.format(self.port_type))
+        logger.debug("[{}] recv thread start".format(self.port_type))
         failed_read_count = 0
         timeout_count = 0
         size = 0
         data_num = 0
-        buffer = b''
+        buffer = b""
         size_is_not_confirm = False
 
         data_prev_us = 0
@@ -160,12 +159,14 @@ class Port(threading.Thread):
         try:
             while self.connected and self.alive:
                 try:
-                    data = self.com_read(4 - data_num if size == 0 else (size - data_num))
+                    data = self.com_read(
+                        4 - data_num if size == 0 else (size - data_num)
+                    )
                 except socket.timeout:
                     timeout_count += 1
                     if timeout_count > 3:
                         self._connected = False
-                        logger.error('[{}] socket read timeout'.format(self.port_type))
+                        logger.error("[{}] socket read timeout".format(self.port_type))
                         break
                     continue
                 else:
@@ -173,7 +174,9 @@ class Port(threading.Thread):
                         failed_read_count += 1
                         if failed_read_count > 5:
                             self._connected = False
-                            logger.error('[{}] socket read failed, len=0'.format(self.port_type))
+                            logger.error(
+                                "[{}] socket read failed, len=0".format(self.port_type)
+                            )
                             break
                         time.sleep(0.1)
                         continue
@@ -186,7 +189,11 @@ class Port(threading.Thread):
                         if size == 233:
                             size_is_not_confirm = True
                             size = 245
-                        logger.info('report_data_size: {}, size_is_not_confirm={}'.format(size, size_is_not_confirm))
+                        logger.info(
+                            "report_data_size: {}, size_is_not_confirm={}".format(
+                                size, size_is_not_confirm
+                            )
+                        )
                     else:
                         if data_num < size:
                             continue
@@ -197,8 +204,16 @@ class Port(threading.Thread):
                                 buffer = buffer[233:]
                                 continue
 
-                        if convert.bytes_to_u32(buffer[0:4]) != size and not (size_is_not_confirm and size == 245 and convert.bytes_to_u32(buffer[0:4]) == 233):
-                            logger.error('report data error, close, length={}, size={}'.format(convert.bytes_to_u32(buffer[0:4]), size))
+                        if convert.bytes_to_u32(buffer[0:4]) != size and not (
+                            size_is_not_confirm
+                            and size == 245
+                            and convert.bytes_to_u32(buffer[0:4]) == 233
+                        ):
+                            logger.error(
+                                "report data error, close, length={}, size={}".format(
+                                    convert.bytes_to_u32(buffer[0:4]), size
+                                )
+                            )
                             break
 
                         # # buffer[494:502]
@@ -237,27 +252,27 @@ class Port(threading.Thread):
                         if self.rx_que.qsize() > 1:
                             self.rx_que.get()
                         self.rx_parse.put(buffer, True)
-                        buffer = b''
+                        buffer = b""
                         data_num = 0
 
                     timeout_count = 0
                     failed_read_count = 0
         except Exception as e:
             if self.alive:
-                logger.error('[{}] recv error: {}'.format(self.port_type, e))
+                logger.error("[{}] recv error: {}".format(self.port_type, e))
         finally:
             self.close()
-        logger.debug('[{}] recv thread had stopped'.format(self.port_type))
+        logger.debug("[{}] recv thread had stopped".format(self.port_type))
         self._connected = False
 
     def recv_proc(self):
         self.alive = True
-        logger.debug('[{}] recv thread start'.format(self.port_type))
-        is_main_tcp = self.port_type == 'main-socket'
-        is_main_serial = self.port_type == 'main-serial'
+        logger.debug("[{}] recv thread start".format(self.port_type))
+        is_main_tcp = self.port_type == "main-socket"
+        is_main_serial = self.port_type == "main-serial"
         try:
             failed_read_count = 0
-            buffer = b''
+            buffer = b""
             while self.connected and self.alive:
                 if is_main_tcp:
                     try:
@@ -268,7 +283,9 @@ class Port(threading.Thread):
                         failed_read_count += 1
                         if failed_read_count > 5:
                             self._connected = False
-                            logger.error('[{}] socket read failed, len=0'.format(self.port_type))
+                            logger.error(
+                                "[{}] socket read failed, len=0".format(self.port_type)
+                            )
                             break
                         time.sleep(0.1)
                         continue
@@ -290,14 +307,13 @@ class Port(threading.Thread):
                 failed_read_count = 0
         except Exception as e:
             if self.alive:
-                logger.error('[{}] recv error: {}'.format(self.port_type, e))
+                logger.error("[{}] recv error: {}".format(self.port_type, e))
         finally:
             self.close()
-        logger.debug('[{}] recv thread had stopped'.format(self.port_type))
+        logger.debug("[{}] recv thread had stopped".format(self.port_type))
         self._connected = False
         # if self.heartbeat_thread:
         #     try:
         #         self.heartbeat_thread.join()
         #     except:
         #         pass
-
