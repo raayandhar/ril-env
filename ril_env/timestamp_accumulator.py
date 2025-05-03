@@ -95,6 +95,9 @@ class TimestampObsAccumulator:
     def data(self):
         if self.timestamp_buffer is None:
             return dict()
+        print("Accumulator stats - len:", len(self), "buffer shape:", 
+              {k: v.shape for k, v in self.obs_buffer.items()})
+        
         result = dict()
         for key, value in self.obs_buffer.items():
             result[key] = value[: len(self)]
@@ -118,6 +121,14 @@ class TimestampObsAccumulator:
             key: T,*
         """
 
+        """
+        print("ACCUMULATOR DEBUG:")
+        print("Input timestamps:", timestamps[:5], "...")
+        print("Start time:", self.start_time)
+        print("Input data keys:", list(data.keys()))
+        print("Input data shapes:", {k: v.shape for k, v in data.items()})
+        """
+
         local_idxs, global_idxs, self.next_global_idx = get_accumulate_timestamp_idxs(
             timestamps=timestamps,
             start_time=self.start_time,
@@ -126,17 +137,26 @@ class TimestampObsAccumulator:
             next_global_idx=self.next_global_idx,
         )
 
+        """
+        print("Local indices:", local_idxs[:5], "...")
+        print("Global indices:", global_idxs[:5], "...")
+        print("Next global idx:", self.next_global_idx)
+        """
+
         if len(global_idxs) > 0:
             if self.timestamp_buffer is None:
                 # first allocation
+                print("First allocation!")
                 self.obs_buffer = dict()
                 for key, value in data.items():
                     self.obs_buffer[key] = np.zeros_like(value)
+                    print(f"Allocated {key} with shape {self.obs_buffer[key].shape}")
                 self.timestamp_buffer = np.zeros((len(timestamps),), dtype=np.float64)
 
             this_max_size = global_idxs[-1] + 1
             if this_max_size > len(self.timestamp_buffer):
                 # reallocate
+                print(f"Reallocating from {len(self.timestamp_buffer)} to {this_max_size}")
                 new_size = max(this_max_size, len(self.timestamp_buffer) * 2)
                 for key in list(self.obs_buffer.keys()):
                     new_shape = (new_size,) + self.obs_buffer[key].shape[1:]
@@ -145,8 +165,19 @@ class TimestampObsAccumulator:
 
             # write data
             for key, value in self.obs_buffer.items():
-                value[global_idxs] = data[key][local_idxs]
+                if key in data:
+                    # print(f"Writing data for {key}")
+                    value[global_idxs] = data[key][local_idxs]
+                else:
+                    print(f"WARNING: Key {key} in obs_buffer but not in input data")
+
+            for key in data.keys():
+                if key not in self.obs_buffer:
+                    print(f"WARNING: Key {key} in input data but not in obs_buffer")
+
             self.timestamp_buffer[global_idxs] = timestamps[local_idxs]
+        else:
+            print("WARNING: No indices to accumulate!")
 
 
 class TimestampActionAccumulator:
