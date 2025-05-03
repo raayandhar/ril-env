@@ -21,11 +21,11 @@ class SharedMemoryQueue:
         buffer_size: int,
     ):
 
-        # create atomic counter
+        # Create atomic counter
         write_counter = SharedAtomicCounter(shm_manager)
         read_counter = SharedAtomicCounter(shm_manager)
 
-        # allocate shared memory
+        # Allocate shared memory
         shared_arrays = dict()
         for spec in array_specs:
             key = spec.name

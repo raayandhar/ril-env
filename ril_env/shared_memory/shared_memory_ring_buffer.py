@@ -34,10 +34,10 @@ class SharedMemoryRingBuffer:
             This influces the buffer size.
         """
 
-        # create atomic counter
+        # Create atomic counter
         counter = SharedAtomicCounter(shm_manager)
 
-        # compute buffer size
+        # Compute buffer size.
         # At any given moment, the past get_max_k items should never
         # be touched (to be read freely). Assuming the reading is reading
         # these k items, which takes maximum of get_time_budget seconds,
@@ -48,7 +48,7 @@ class SharedMemoryRingBuffer:
             + get_max_k
         )
 
-        # allocate shared memory
+        # Allocate shared memory
         shared_arrays = dict()
         for spec in array_specs:
             key = spec.name
@@ -60,7 +60,7 @@ class SharedMemoryRingBuffer:
             )
             shared_arrays[key] = array
 
-        # allocate timestamp array
+        # Allocate timestamp array
         timestamp_array = SharedNDArray.create_from_shape(
             mem_mgr=shm_manager, shape=(buffer_size,), dtype=np.float64
         )
@@ -133,10 +133,10 @@ class SharedMemoryRingBuffer:
         if (t - old_timestamp) < self.get_time_budget:
             deltat = t - old_timestamp
             if wait:
-                # sleep the remaining time to be safe
+                # Sleep the remaining time to be safe
                 time.sleep(self.get_time_budget - deltat)
             else:
-                # throw an error
+                # Throw an error
                 past_iters = self.buffer_size - self.get_max_k
                 hz = past_iters / deltat
                 raise TimeoutError(
@@ -145,7 +145,7 @@ class SharedMemoryRingBuffer:
                     )
                 )
 
-        # write to shared memory
+        # Write to shared memory
         for key, value in data.items():
             arr: np.ndarray
             arr = self.shared_arrays[key].get()
@@ -154,7 +154,7 @@ class SharedMemoryRingBuffer:
             else:
                 arr[next_idx] = np.array(value, dtype=arr.dtype)
 
-        # update timestamp
+        # Update timestamp
         self.timestamp_array.get()[next_idx] = time.monotonic()
         self.counter.add(1)
 
@@ -202,7 +202,7 @@ class SharedMemoryRingBuffer:
 
             remainder = k - (end - start)
             if remainder > 0:
-                # wrap around
+                # Wrap around
                 end = self.buffer_size
                 start = end - remainder
                 target_start = 0

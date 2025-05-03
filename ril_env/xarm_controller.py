@@ -8,8 +8,8 @@ import logging
 from typing import List
 from xarm.wrapper import XArmAPI
 from multiprocessing.managers import SharedMemoryManager
-from shared_memory.shared_memory_queue import SharedMemoryQueue, Empty
-from shared_memory.shared_memory_ring_buffer import SharedMemoryRingBuffer
+from ril_env.shared_memory.shared_memory_queue import SharedMemoryQueue, Empty
+from ril_env.shared_memory.shared_memory_ring_buffer import SharedMemoryRingBuffer
 from dataclasses import dataclass, field
 from ril_env.spacemouse import Spacemouse
 
@@ -31,13 +31,17 @@ class XArmConfig:
     home_pos: List[int] = field(default_factory=lambda: [0, 0, 0, 70, 0, 70, 0])
     home_speed: float = 50.0
     tcp_maxacc: int = 5000
-    verbose: bool = False  # switch off
+    verbose: bool = False  # Switch off
 
 
 class XArm:
     """
-    At this point, this is legacy code. If you want to record
-    data, please use the multiprocessing-emabled XArmController.
+    This XArm object is a wrapper around the xArm API. 
+    It is not thread-safe and should not be used in a 
+    multi-threaded context. If you want to record data,
+    please use the XArmController class instead. You can
+    use this class if you just want to control the xArm
+    directly.
     """
 
     def __init__(self, xarm_config: XArmConfig):
@@ -237,7 +241,7 @@ class Command(enum.Enum):
     STOP = 0
     STEP = 1
     HOME = 2
-    # May add more commands here. e.g. SCHEDULE_WAYPOINT
+    WAYPOINT = 3
 
 
 class XArmController(mp.Process):
