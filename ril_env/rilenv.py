@@ -298,12 +298,12 @@ class RILEnv:
         if self.obs_accumulator is not None:
             # Create a complete observation that includes both robot and camera
             complete_obs = dict()
-            
+
             # Add robot observations with original keys
             for k, v in last_robot_data.items():
                 if k in self.obs_key_map:
                     complete_obs[k] = v
-            
+
             # Add camera observations
             """
             for camera_idx, data in self.last_realsense_data.items():
@@ -313,8 +313,10 @@ class RILEnv:
             # Create absolute timestamps for accumulation
             now = time.time()
             relative_timestamps = robot_timestamps
-            absolute_timestamps = np.array([now + (t - relative_timestamps[0]) for t in relative_timestamps])
-            
+            absolute_timestamps = np.array(
+                [now + (t - relative_timestamps[0]) for t in relative_timestamps]
+            )
+
             # Put data in the accumulator
             self.obs_accumulator.put(complete_obs, absolute_timestamps)
 
@@ -344,7 +346,7 @@ class RILEnv:
         new_actions = actions[is_new]
         new_timestamps = timestamps[is_new]
         new_stages = stages[is_new]
-        
+
         # Execute robot actions
         for i in range(len(new_actions)):
             new_action = new_actions[i]
@@ -372,7 +374,7 @@ class RILEnv:
     def start_episode(self, start_time=None):
         if start_time is None:
             start_time = time.time()
-        
+
         # Use absolute timestamps for everything
         self.start_time = start_time
 

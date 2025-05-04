@@ -36,8 +36,8 @@ class XArmConfig:
 
 class XArm:
     """
-    This XArm object is a wrapper around the xArm API. 
-    It is not thread-safe and should not be used in a 
+    This XArm object is a wrapper around the xArm API.
+    It is not thread-safe and should not be used in a
     multi-threaded context. If you want to record data,
     please use the XArmController class instead. You can
     use this class if you just want to control the xArm

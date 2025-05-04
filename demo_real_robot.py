@@ -196,5 +196,6 @@ def main(
             finally:
                 logger.info("Exiting main loop. Cleaning up...")
 
+
 if __name__ == "__main__":
     main()
