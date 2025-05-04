@@ -6,20 +6,24 @@ import shutil
 import pathlib
 
 from multiprocessing.managers import SharedMemoryManager
-from ril_env.xarm_controller import XArmConfig, XArmController
-from ril_env.replay_buffer import ReplayBuffer
-from ril_env.realsense import SingleRealsense
-from ril_env.cv2_util import get_image_transform, optimal_row_cols
-from ril_env.video_recorder import VideoRecorder
-from ril_env.multi_realsense import MultiRealsense
-from ril_env.multi_camera_visualizer import MultiCameraVisualizer
-from ril_env.timestamp_accumulator import (
+from ril_env.control.xarm_controller import XArmConfig, XArmController
+from ril_env.record_utils.replay_buffer import ReplayBuffer
+from ril_env.realsense.single_realsense import SingleRealsense
+from ril_env.utils.cv2_util import get_image_transform, optimal_row_cols
+from ril_env.record_utils.video_recorder import VideoRecorder
+from ril_env.realsense.multi_realsense import MultiRealsense
+from ril_env.utils.multi_camera_visualizer import MultiCameraVisualizer
+from ril_env.record_utils.timestamp_accumulator import (
     TimestampActionAccumulator,
     TimestampObsAccumulator,
 )
 from typing import Tuple, List, Optional, Dict, Union
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 logger = logging.getLogger(__name__)
 
 DEFAULT_OBS_KEY_MAP = {
@@ -41,7 +45,7 @@ DEFAULT_OBS_KEY_MAP = {
 }
 
 
-class RealEnv:
+class RILEnv:
     def __init__(
         self,
         output_dir: Union[pathlib.Path, str] = "./recordings/",

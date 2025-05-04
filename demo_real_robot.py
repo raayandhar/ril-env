@@ -1,7 +1,6 @@
 import time
 import traceback
 import click
-import cv2
 import numpy as np
 import scipy.spatial.transform as st
 import logging
@@ -9,11 +8,11 @@ import pathlib
 
 from multiprocessing.managers import SharedMemoryManager
 
-from ril_env.spacemouse import Spacemouse
-from ril_env.keystroke_counter import KeystrokeCounter, Key, KeyCode
-from ril_env.precise_sleep import precise_wait
-from ril_env.xarm_controller import XArmConfig, XArm
-from ril_env.real_env import RealEnv
+from ril_env.control.spacemouse import Spacemouse
+from ril_env.control.xarm_controller import XArmConfig, XArm
+from ril_env.utils.keystroke_counter import KeystrokeCounter, Key, KeyCode
+from ril_env.utils.precise_sleep import precise_wait
+from ril_env.rilenv import RILEnv
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -46,7 +45,7 @@ def main(
     with SharedMemoryManager() as shm_manager:
         with KeystrokeCounter() as key_counter, Spacemouse(
             deadzone=spacemouse_deadzone, shm_manager=shm_manager
-        ) as sm, RealEnv(
+        ) as sm, RILEnv(
             output_dir=output_dir,
             xarm_config=xarm_config,
             frequency=frequency,

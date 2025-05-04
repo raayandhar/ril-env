@@ -1,5 +1,7 @@
 from ril_env.xarm_controller import XArm, XArmConfig
 
+
+# Should move this into demo_real_robot.py..
 def main():
     xarm_config = XArmConfig()
 

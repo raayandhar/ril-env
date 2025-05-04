@@ -1,11 +1,11 @@
 # ril-env
+All of this information is old and outdated, and will be updated soon.
+
 **ril-env** is an environment management package designed for robotic control, perception and simulation. It provides an API and programmatic interface to manage state-action flow for both real hardware robots and sensors and their simulation counterparts.
 
 Currently, **ril-env** supports record-replay of the xArm 7 robotic arm on a single machine, with the option of camera perception running in a seperate thread.
 
 More features will be added soon; see the issues tab under the repository.
-
-![System Design](system_design.png)
 
 ## Having trouble connecting?
 Run the following

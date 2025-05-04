@@ -1,9 +1,8 @@
 import numpy as np
 import av
 
-
 from typing import Optional, Callable, Generator
-from ril_env.timestamp_accumulator import get_accumulate_timestamp_idxs
+from ril_env.record_utils.timestamp_accumulator import get_accumulate_timestamp_idxs
 
 
 def read_video(

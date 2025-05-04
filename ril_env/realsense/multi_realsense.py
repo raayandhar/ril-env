@@ -6,9 +6,14 @@ import logging
 from multiprocessing.managers import SharedMemoryManager
 from typing import List, Optional, Union, Dict, Callable
 
-from ril_env.realsense import SingleRealsense
-from ril_env.video_recorder import VideoRecorder
+from ril_env.realsense.single_realsense import SingleRealsense
+from ril_env.record_utils.video_recorder import VideoRecorder
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 logger = logging.getLogger(__name__)
 
 

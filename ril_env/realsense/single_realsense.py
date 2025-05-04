@@ -8,11 +8,12 @@ import pyrealsense2 as rs
 from threadpoolctl import threadpool_limits
 from multiprocessing.managers import SharedMemoryManager
 from typing import Optional, Callable, Dict
-from ril_env.timestamp_accumulator import get_accumulate_timestamp_idxs
-from ril_env.video_recorder import VideoRecorder
-from shared_memory.shared_ndarray import SharedNDArray
-from shared_memory.shared_memory_ring_buffer import SharedMemoryRingBuffer
-from shared_memory.shared_memory_queue import SharedMemoryQueue, Empty
+
+from ril_env.record_utils.timestamp_accumulator import get_accumulate_timestamp_idxs
+from ril_env.record_utils.video_recorder import VideoRecorder
+from ril_env.shared_memory.shared_ndarray import SharedNDArray
+from ril_env.shared_memory.shared_memory_ring_buffer import SharedMemoryRingBuffer
+from ril_env.shared_memory.shared_memory_queue import SharedMemoryQueue, Empty
 
 
 class Command(enum.Enum):

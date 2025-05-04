@@ -10,8 +10,8 @@ from xarm.wrapper import XArmAPI
 from multiprocessing.managers import SharedMemoryManager
 from ril_env.shared_memory.shared_memory_queue import SharedMemoryQueue, Empty
 from ril_env.shared_memory.shared_memory_ring_buffer import SharedMemoryRingBuffer
+from ril_env.control.spacemouse import Spacemouse
 from dataclasses import dataclass, field
-from ril_env.spacemouse import Spacemouse
 
 
 logging.basicConfig(

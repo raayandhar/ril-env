@@ -1,7 +1,8 @@
-from typing import Tuple
 import math
 import cv2
 import numpy as np
+
+from typing import Tuple
 
 
 def draw_reticle(img, u, v, label_color):

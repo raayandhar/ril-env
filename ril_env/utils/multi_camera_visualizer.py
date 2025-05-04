@@ -2,8 +2,9 @@ import time
 import multiprocessing as mp
 import numpy as np
 import cv2
+
 from threadpoolctl import threadpool_limits
-from ril_env.multi_realsense import MultiRealsense
+from ril_env.realsense.multi_realsense import MultiRealsense
 
 
 class MultiCameraVisualizer(mp.Process):

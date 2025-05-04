@@ -1,5 +1,4 @@
 import time
-import numpy as np
 import zarr
 import logging
 import argparse
@@ -9,7 +8,11 @@ from multiprocessing.managers import SharedMemoryManager
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def replay_demonstration(episode_idx=0, zarr_path="./recordings/replay_buffer.zarr", debug=False):
+
+# Expand this so we can use it directly in rilenv.
+def replay_demonstration(episode_idx=0, 
+                         zarr_path="./recordings/replay_buffer.zarr", 
+                         debug=False):
     """
     Replay a demonstration from the replay buffer.
     
