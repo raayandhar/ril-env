@@ -73,24 +73,24 @@ def goto(robot, realsense_streamer, pixel_selector, TCR, refine=False):
     robot.go_home()
     ee_pos, ee_euler = robot.pose_ee()
 
-    state_log = robot.move_to_ee_pose(
+    robot.move_to_ee_pose(
         ee_pos,
         ee_euler,
     )
     _, ee_euler = robot.pose_ee()
     # # #
 
-    state_log = robot.move_to_ee_pose(
+    robot.move_to_ee_pose(
         lift_pos,
         ee_euler,
     )
 
-    state_log = robot.move_to_ee_pose(
+    robot.move_to_ee_pose(
         ee_pos_desired,
         ee_euler,
     )
 
-    state_log = robot.move_to_ee_pose(
+    robot.move_to_ee_pose(
         lift_pos,
         ee_euler,
     )

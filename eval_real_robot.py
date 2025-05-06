@@ -105,7 +105,7 @@ def main(
 
     xarm_config = XArmConfig()
 
-    obs_res = get_real_obs_resolution(cfg.task.shape_meta)
+    get_real_obs_resolution(cfg.task.shape_meta)
     n_obs_steps = cfg.n_obs_steps
     logger.info(f"n_obs_steps: {n_obs_steps}")
     logger.info(f"steps_per_inference: {steps_per_inference}")

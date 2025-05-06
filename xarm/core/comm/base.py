@@ -144,17 +144,7 @@ class Port(threading.Thread):
         buffer = b""
         size_is_not_confirm = False
 
-        data_prev_us = 0
-        data_curr_us = 0
-        data_max_interval_us = 0
-        data_over_us = 205 * 1000  # over 205ms, cnts++
-        data_over_cnts = 0
 
-        recv_prev_us = 0
-        recv_curr_us = 0
-        recv_max_interval_us = 0
-        recv_over_us = 300 * 1000  # over 300ms, cnts++
-        recv_over_cnts = 0
 
         try:
             while self.connected and self.alive:

@@ -65,7 +65,7 @@ def main(
         ) as env:
             logger.info("Configuring camera settings...")
             env.realsense.set_exposure(exposure=120, gain=0)
-            env.realsense.set_white_balance(white_balance=5900)
+            env.realsense.set_white_balance(white_balance=6200)
 
             time.sleep(1)
             logger.info("System initialized")
@@ -117,27 +117,6 @@ def main(
 
                     stage_val = key_counter[Key.space]
 
-                    # vis_img = obs[f"camera_{vis_camera_idx}"][-1, :, :, ::-1].copy()
-
-                    episode_id = env.replay_buffer.n_episodes
-                    text_str = f"Episode: {episode_id}, Stage: {stage_val}"
-                    if is_recording:
-                        text_str += " [RECORDING]"
-                    """
-                    cv2.putText(
-                        vis_img,
-                        text_str,
-                        (10, 30),
-                        fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-                        fontScale=1.0,
-                        color=(255, 255, 255),
-                        thickness=2,
-                    )
-
-                    cv2.imshow("Robot Teleop", vis_img)
-                    cv2.waitKey(1)
-
-                    """
                     precise_wait(t_sample)
 
                     sm_state = sm.get_motion_state_transformed()

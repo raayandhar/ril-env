@@ -5,7 +5,7 @@ from ril_env.control.xarm_controller import XArm, XArmConfig
 def main():
     xarm_config = XArmConfig()
 
-    with XArm(xarm_config) as arm:
+    with XArm(xarm_config):
         try:
             print("Homing.")
         except KeyboardInterrupt:

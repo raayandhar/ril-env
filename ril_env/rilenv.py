@@ -12,7 +12,6 @@ from ril_env.realsense.single_realsense import SingleRealsense
 from ril_env.utils.cv2_util import get_image_transform, optimal_row_cols
 from ril_env.record_utils.video_recorder import VideoRecorder
 from ril_env.realsense.multi_realsense import MultiRealsense
-from ril_env.utils.multi_camera_visualizer import MultiCameraVisualizer
 from ril_env.record_utils.timestamp_accumulator import (
     TimestampActionAccumulator,
     TimestampObsAccumulator,
@@ -60,7 +59,7 @@ class RILEnv:
         init_joints: bool = False,
         video_capture_fps: int = 30,
         video_capture_resolution: Tuple[int, int] = (1280, 720),
-        record_raw_video: bool = True,
+        record_raw_video: bool = False,
         thread_per_video: int = 3,
         video_crf: int = 3,
         enable_multi_cam_vis: bool = False,
@@ -116,7 +115,10 @@ class RILEnv:
 
         def transform(data):
             if "color" in data:
-                data["color"] = color_transform(data["color"])
+                img = color_tf(data["color"])
+                if img.dtype != np.uint8:
+                    img = (img * 255).astype(np.uint8)
+                data["color"] = img
             return data
 
         # Multi-cam visual transformation
@@ -136,17 +138,13 @@ class RILEnv:
                 data["color"] = vis_color_transform(data["color"])
             return data
 
-        recording_transform = None
+        recording_transform = transform
         recording_fps = video_capture_fps
-        recording_pix_fmt = "bgr24"
-        if not record_raw_video:
-            recording_transform = transform
-            recording_fps = frequency
-            recording_pix_fmt = "rgb24"
+        recording_pix_fmt = "rgb24"
 
         video_recorder = VideoRecorder.create_h264(
             fps=recording_fps,
-            codec="h264",
+            codec="libx264",
             input_pix_fmt=recording_pix_fmt,
             crf=video_crf,
             thread_type="FRAME",
@@ -175,6 +173,7 @@ class RILEnv:
 
         multi_cam_vis = None
         if enable_multi_cam_vis:
+            print("MULTICAMVIS ENABLE")
             multi_cam_vis = MultiCameraVisualizer(
                 realsense=realsense,
                 row=row,
@@ -223,7 +222,8 @@ class RILEnv:
             self.realsense.start(wait=False)
             self.robot.start(wait=False)
         if self.multi_cam_vis is not None:
-            self.multi_cam_vis.start(wait=False)
+            print("MULTICAMVIS START")
+            self.multi_cam_vis.start(wait=True)
 
     def stop(self, wait=True):
         self.end_episode()
@@ -234,7 +234,8 @@ class RILEnv:
             self.realsense.stop(wait=False)
             self.robot.stop(wait=False)
         if self.multi_cam_vis is not None:
-            self.multi_cam_vis.stop(wait=False)
+            print("MULTICAMVIS STOP")
+            self.multi_cam_vis.stop(wait=True)
 
     def __enter__(self):
         self.start()

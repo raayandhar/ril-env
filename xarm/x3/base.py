@@ -1785,7 +1785,7 @@ class Base(BaseObject, Events):
             elif self._arm_type == 3:
                 self._arm_axis = 7
 
-            ver_msg = rx_data[93:122]
+            rx_data[93:122]
             # self._version = str(ver_msg, 'utf-8')
 
             trs_msg = convert.bytes_to_fp32s(rx_data[123:143], 5)
@@ -1820,7 +1820,7 @@ class Base(BaseObject, Events):
             self._rot_jerk, self._max_rot_acc = rot_msg
             # print('rot_jerk: {}, mac_acc: {}'.format(self._rot_jerk, self._max_rot_acc))
 
-            sv3_msg = convert.bytes_to_u16s(rx_data[171:187], 8)
+            convert.bytes_to_u16s(rx_data[171:187], 8)
             self._first_report_over = True
 
         def __handle_report_real(rx_data):

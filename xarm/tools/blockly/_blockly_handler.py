@@ -1744,7 +1744,7 @@ class _BlocklyHandler(_BlocklyBase):
 
     def _handle_studio_run_blockly(self, block, indent=0, arg_map=None):
         fields = self._get_nodes("field", root=block)
-        projectName = fields[0].text
+        fields[0].text
         fileName = fields[1].text
         times = fields[2].text
         if not self._is_exec:

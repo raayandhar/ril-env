@@ -52,7 +52,7 @@ class MarkSearch:
 
         # check if the HSV of the frame is lower or upper red
         Red_mask = cv2.inRange(HSV, lower, upper)
-        result = cv2.bitwise_and(frame, frame, mask=Red_mask)
+        cv2.bitwise_and(frame, frame, mask=Red_mask)
 
         # Draw rectangular bounded line on the detected red area
         (contours, _) = cv2.findContours(

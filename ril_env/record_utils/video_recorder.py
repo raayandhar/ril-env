@@ -80,21 +80,27 @@ class VideoRecorder:
     def create_h264(
         cls,
         fps,
-        codec="h264",
+        codec="libx264",
         input_pix_fmt="rgb24",
         output_pix_fmt="yuv420p",
         crf=18,
         profile="high",
         **kwargs
     ):
+        real_codec = codec
+        real_pix_fmt = output_pix_fmt
+
+        x264_opts = {"crf": str(crf), "profile": profile}
+
         obj = cls(
             fps=fps,
-            codec=codec,
+            codec=real_codec,
             input_pix_fmt=input_pix_fmt,
-            pix_fmt=output_pix_fmt,
-            options={"crf": str(crf), "profile": profile},
+            pix_fmt=real_pix_fmt,
+            options=x264_opts,
             **kwargs
         )
+
         return obj
 
     def __del__(self):

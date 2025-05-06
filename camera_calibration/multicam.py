@@ -301,7 +301,7 @@ class MultiCam:
         waypoints_rob = []
         waypoints_cam = {c.serial_no: [] for c in self.cameras}
 
-        state_log = robot.move_to_ee_pose(ee_pos, calib_euler)
+        robot.move_to_ee_pose(ee_pos, calib_euler)
 
         itr = 0
         for waypoint in waypoints:
@@ -313,7 +313,7 @@ class MultiCam:
             intermed_waypoints = {}
             for idx, cam in enumerate(self.cameras):
                 calib_euler = calib_eulers[idx]
-                state_log = robot.move_to_ee_pose(
+                robot.move_to_ee_pose(
                     waypoint,
                     calib_euler,
                 )
