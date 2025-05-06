@@ -15,7 +15,7 @@ from omegaconf import OmegaConf
 from ril_env.spacemouse import Spacemouse
 from ril_env.keystroke_counter import KeystrokeCounter, Key, KeyCode
 from ril_env.precise_sleep import precise_wait
-from ril_env.xarm_controller import XArmConfig, XArm
+from ril_env.xarm_controller import XArmConfig
 from ril_env.real_env import RealEnv
 
 """

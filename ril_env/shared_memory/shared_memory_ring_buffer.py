@@ -4,8 +4,8 @@ import numpy as np
 
 from typing import Dict, List, Union
 from multiprocessing.managers import SharedMemoryManager
-from shared_memory.shared_ndarray import SharedNDArray
-from shared_memory.shared_memory_util import ArraySpec, SharedAtomicCounter
+from ril_env.shared_memory.shared_ndarray import SharedNDArray
+from ril_env.shared_memory.shared_memory_util import ArraySpec, SharedAtomicCounter
 
 
 class SharedMemoryRingBuffer:

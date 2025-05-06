@@ -1,4 +1,4 @@
-from ril_env.xarm_controller import XArm, XArmConfig
+from ril_env.control.xarm_controller import XArm, XArmConfig
 
 
 # Should move this into demo_real_robot.py..

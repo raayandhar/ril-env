@@ -9,7 +9,7 @@ import pathlib
 from multiprocessing.managers import SharedMemoryManager
 
 from ril_env.control.spacemouse import Spacemouse
-from ril_env.control.xarm_controller import XArmConfig, XArm
+from ril_env.control.xarm_controller import XArmConfig
 from ril_env.utils.keystroke_counter import KeystrokeCounter, Key, KeyCode
 from ril_env.utils.precise_sleep import precise_wait
 from ril_env.rilenv import RILEnv
