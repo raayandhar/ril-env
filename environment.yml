@@ -54,13 +54,18 @@ dependencies:
   - zstd=1.5.6=hc292b87_0
   - pip:
       - addict==2.4.0
+      - annotated-types==0.7.0
+      - antlr4-python3-runtime==4.9.3
       - asttokens==2.4.1
+      - atomics==1.0.2
       - attrs==24.2.0
+      - av==12.3.0
       - backcall==0.2.0
       - blinker==1.8.2
       - build==1.2.2.post1
       - cachetools==5.5.0
       - certifi==2024.8.30
+      - cffi==1.17.1
       - cfgv==3.4.0
       - chardet==5.2.0
       - charset-normalizer==3.3.2
@@ -74,7 +79,13 @@ dependencies:
       - dash-html-components==2.0.0
       - dash-table==5.0.0
       - decorator==5.1.1
+      - diffusers==0.33.1
+      - dill==0.4.0
       - distlib==0.3.8
+      - docker-pycreds==0.4.0
+      - einops==0.8.1
+      - eval-type-backport==0.2.2
+      - evdev==1.9.1
       - exceptiongroup==1.2.2
       - executing==2.1.0
       - fastjsonschema==2.20.0
@@ -82,7 +93,12 @@ dependencies:
       - flask==3.0.3
       - fonttools==4.54.1
       - fsspec==2024.9.0
+      - gitdb==4.0.12
+      - gitpython==3.1.44
       - hidapi==0.14.0.post2
+      - huggingface-hub==0.30.2
+      - hydra==2.5
+      - hydra-core==1.3.2
       - identify==2.6.1
       - idna==3.10
       - imageio==2.35.1
@@ -122,6 +138,7 @@ dependencies:
       - nvidia-nccl-cu12==2.20.5
       - nvidia-nvjitlink-cu12==12.6.77
       - nvidia-nvtx-cu12==12.1.105
+      - omegaconf==2.3.0
       - open3d==0.18.0
       - opencv-python==4.10.0.84
       - pandas==2.0.3
@@ -135,9 +152,15 @@ dependencies:
       - pluggy==1.5.0
       - pre-commit==3.5.0
       - prompt-toolkit==3.0.48
+      - protobuf==5.29.4
+      - psutil==7.0.0
       - ptyprocess==0.7.0
       - pure-eval==0.2.3
+      - pycparser==2.22
+      - pydantic==2.10.6
+      - pydantic-core==2.27.2
       - pygments==2.18.0
+      - pynput==1.8.1
       - pyparsing==3.1.4
       - pyproject-api==1.8.0
       - pyproject-hooks==1.2.0
@@ -146,16 +169,22 @@ dependencies:
       - pyserial==3.5
       - pytest==8.3.3
       - python-dateutil==2.9.0.post0
+      - python-xlib==0.33
       - pytz==2024.2
       - pyyaml==6.0.2
       - referencing==0.35.1
+      - regex==2024.11.6
       - requests==2.32.3
       - retrying==1.3.4
       - rpds-py==0.20.0
+      - safetensors==0.5.3
       - scikit-learn==1.3.2
       - scipy==1.10.1
+      - sentry-sdk==2.27.0
+      - setproctitle==1.3.5
       - six==1.16.0
-      - spnav==0.9
+      - smmap==5.0.2
+      - spnav @ https://github.com/cheng-chi/spnav/archive/c1c938ebe3cc542db4685e0d13850ff1abfdb943.tar.gz
       - stack-data==0.6.3
       - sympy==1.13.3
       - tenacity==9.0.0
@@ -170,6 +199,7 @@ dependencies:
       - tzdata==2024.2
       - urllib3==2.2.3
       - virtualenv==20.26.6
+      - wandb==0.19.10
       - wcwidth==0.2.13
       - werkzeug==3.0.4
       - widgetsnbextension==4.0.13
