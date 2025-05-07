@@ -29,9 +29,7 @@ TODO:
 
 def main(
     output="./recordings/",
-    vis_camera_idx=0,
-    init_joints=True,  # Not used ATM
-    frequency=30,  # Cannot increase frequency
+    frequency=30,  # Cannot increase frequency past this.
     command_latency=0.01,
     record_res=(1280, 720),
     spacemouse_deadzone=0.05,
@@ -53,17 +51,15 @@ def main(
             obs_image_resolution=record_res,
             max_obs_buffer_size=30,
             obs_float32=True,
-            init_joints=init_joints,
             video_capture_fps=30,
             video_capture_resolution=record_res,
-            record_raw_video=True,
             thread_per_video=3,
             video_crf=21,
             shm_manager=shm_manager,
         ) as env:
             logger.info("Configuring camera settings...")
             env.realsense.set_exposure(exposure=120, gain=0)
-            env.realsense.set_white_balance(white_balance=6200)
+            env.realsense.set_white_balance(white_balance=3000)
 
             time.sleep(1)
             logger.info("System initialized")
@@ -85,11 +81,7 @@ def main(
                     t_command_target = t_cycle_end + dt
                     t_sample = t_cycle_end - command_latency
 
-                    # Pump obs
                     obs = env.get_obs()
-                    # Let's get camera data as well.
-                    # Should find out what the obs dict is doing.
-                    # print(obs)
 
                     press_events = key_counter.get_press_events()
 
@@ -138,7 +130,6 @@ def main(
                         target_pose[:3] += dpos
                         target_pose[3:] = final_rot.as_euler("xyz", degrees=True)
 
-                        # Grasp does not work.
                         action = np.concatenate([target_pose, [grasp]])
 
                         exec_timestamp = (

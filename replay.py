@@ -2,7 +2,7 @@ import time
 import zarr
 import logging
 import argparse
-from ril_env.xarm_controller import XArmConfig, XArmController
+from ril_env.control.xarm_controller import XArmConfig, XArmController
 from multiprocessing.managers import SharedMemoryManager
 
 logging.basicConfig(level=logging.INFO)

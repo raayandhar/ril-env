@@ -56,10 +56,8 @@ class RILEnv:
         camera_serial_numbers: Optional[List[int]] = None,
         obs_key_map: Dict = DEFAULT_OBS_KEY_MAP,
         obs_float32: bool = False,
-        init_joints: bool = False,
         video_capture_fps: int = 30,
         video_capture_resolution: Tuple[int, int] = (1280, 720),
-        record_raw_video: bool = False,
         thread_per_video: int = 3,
         video_crf: int = 3,
         shm_manager: Optional[SharedMemoryManager] = None,
@@ -206,7 +204,6 @@ class RILEnv:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.stop()
 
-    # Async env API
     def get_obs(self) -> Dict:
         "observation dict"
         assert self.is_ready
@@ -257,30 +254,19 @@ class RILEnv:
         for k, v in robot_obs_raw.items():
             robot_obs[k] = v[this_idxs]
 
-        # Accumulate observations
         if self.obs_accumulator is not None:
-            # Create a complete observation that includes both robot and camera
             complete_obs = dict()
 
-            # Add robot observations with original keys
             for k, v in last_robot_data.items():
                 if k in self.obs_key_map:
                     complete_obs[k] = v
 
-            # Add camera observations
-            """
-            for camera_idx, data in self.last_realsense_data.items():
-                camera_key = f"Camera_{camera_idx}"
-                complete_obs[camera_key] = data["color"]
-            """
-            # Create absolute timestamps for accumulation
             now = time.time()
             relative_timestamps = robot_timestamps
             absolute_timestamps = np.array(
                 [now + (t - relative_timestamps[0]) for t in relative_timestamps]
             )
 
-            # Put data in the accumulator
             self.obs_accumulator.put(complete_obs, absolute_timestamps)
 
         obs_data = dict(camera_obs)
@@ -310,16 +296,13 @@ class RILEnv:
         new_timestamps = timestamps[is_new]
         new_stages = stages[is_new]
 
-        # Execute robot actions
         for i in range(len(new_actions)):
             new_action = new_actions[i]
             pose = new_action[:6]
             grasp = new_action[-1]
             self.robot.step(pose, grasp)
 
-        # Record actions if recording
         if self.action_accumulator is not None:
-            # Use the same timestamps for both robot and recordings
             self.action_accumulator.put(
                 new_actions,
                 new_timestamps,
@@ -338,7 +321,6 @@ class RILEnv:
         if start_time is None:
             start_time = time.time()
 
-        # Use absolute timestamps for everything
         self.start_time = start_time
 
         assert self.is_ready
@@ -351,11 +333,9 @@ class RILEnv:
         for i in range(n_cameras):
             video_paths.append(str(this_video_dir.joinpath(f"{i}.mp4").absolute()))
 
-        # Use absolute timestamps for recordings
         self.realsense.restart_put(start_time=start_time)
         self.realsense.start_recording(video_path=video_paths, start_time=start_time)
 
-        # Initialize accumulators with absolute timestamps
         self.obs_accumulator = TimestampObsAccumulator(
             start_time=start_time,
             dt=1 / self.frequency,

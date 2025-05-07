@@ -29,6 +29,7 @@ class XArmConfig:
     position_gain: float = 2.0
     orientation_gain: float = 2.0
     home_pos: List[int] = field(default_factory=lambda: [0, 0, 0, 70, 0, 70, 0])
+    home_on_shutdown: bool = True
     home_speed: float = 50.0
     tcp_maxacc: int = 5000
     verbose: bool = False  # Switch off
@@ -129,7 +130,9 @@ class XArm:
         if not self.init:
             logger.error("shutdown() called on an uninitialized xArm.")
             return
-        self.home()
+        if self.config.home_on_shutdown:
+            self.home()
+        
         self.arm.disconnect()
         logger.info("xArm shutdown complete.")
 
@@ -228,6 +231,12 @@ class XArm:
         state["ActualQd"] = actual_joint_speeds
 
         return state
+    
+    def set_gripper_position(self, position):
+        code = self.arm.set_gripper_position(position, wait=False)
+        if code != 0:
+            logger.error(f"Error in set_gripper_position: {code}")
+            raise RuntimeError(f"Error in set_gripper_position: {code}")
 
     def __enter__(self):
         self.initialize()
