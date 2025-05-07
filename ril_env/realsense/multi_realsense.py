@@ -42,7 +42,6 @@ class MultiRealsense:
         get_max_k=30,
         advanced_mode_config: Optional[Union[dict, List[dict]]] = None,
         transform: Optional[Union[Callable[[Dict], Dict], List[Callable]]] = None,
-        vis_transform: Optional[Union[Callable[[Dict], Dict], List[Callable]]] = None,
         recording_transform: Optional[
             Union[Callable[[Dict], Dict], List[Callable]]
         ] = None,
@@ -62,7 +61,6 @@ class MultiRealsense:
 
         advanced_mode_config = repeat_to_list(advanced_mode_config, n_cameras, dict)
         transform = repeat_to_list(transform, n_cameras, Callable)
-        vis_transform = repeat_to_list(vis_transform, n_cameras, Callable)
         recording_transform = repeat_to_list(recording_transform, n_cameras, Callable)
         video_recorder = repeat_to_list(video_recorder, n_cameras, VideoRecorder)
 
@@ -83,7 +81,6 @@ class MultiRealsense:
                 get_max_k=get_max_k,
                 advanced_mode_config=advanced_mode_config[i],
                 transform=transform[i],
-                vis_transform=vis_transform[i],
                 recording_transform=recording_transform[i],
                 video_recorder=video_recorder[i],
                 verbose=verbose,
@@ -151,23 +148,6 @@ class MultiRealsense:
             i += 1
         return out
 
-    def get_vis(self, out=None):
-
-        # This code is rarely used except for MultiCameraVisualizer
-        results = []
-        for i, camera in enumerate(self.cameras.values()):
-            this_out = None
-            if out is not None and i in out:
-                this_out = out[i]
-            this_out = camera.get_vis(out=this_out)
-            if out is None:
-                results.append(this_out)
-        if out is None and len(results) > 0:
-            # stack them
-            out = {}
-            for key in results[0].keys():
-                out[key] = np.stack([x[key] for x in results])
-        return out
 
     def set_color_option(self, option, value):
         logger.info(f"MultiRealsense.set_color_option({option}, {value})")

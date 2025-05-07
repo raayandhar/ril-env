@@ -59,8 +59,6 @@ def main(
             record_raw_video=True,
             thread_per_video=3,
             video_crf=21,
-            enable_multi_cam_vis=False,  # Totally broken RN
-            multi_cam_vis_resolution=(1280, 720),
             shm_manager=shm_manager,
         ) as env:
             logger.info("Configuring camera settings...")

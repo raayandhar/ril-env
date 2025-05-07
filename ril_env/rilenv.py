@@ -9,7 +9,7 @@ from multiprocessing.managers import SharedMemoryManager
 from ril_env.control.xarm_controller import XArmConfig, XArmController
 from ril_env.record_utils.replay_buffer import ReplayBuffer
 from ril_env.realsense.single_realsense import SingleRealsense
-from ril_env.utils.cv2_util import get_image_transform, optimal_row_cols
+from ril_env.utils.cv2_util import get_image_transform
 from ril_env.record_utils.video_recorder import VideoRecorder
 from ril_env.realsense.multi_realsense import MultiRealsense
 from ril_env.record_utils.timestamp_accumulator import (
@@ -62,8 +62,6 @@ class RILEnv:
         record_raw_video: bool = False,
         thread_per_video: int = 3,
         video_crf: int = 3,
-        enable_multi_cam_vis: bool = False,
-        multi_cam_vis_resolution: Tuple[int, int] = (1280, 720),
         shm_manager: Optional[SharedMemoryManager] = None,
     ):
         logger.info("[RealEnv] Initializing environment.")
@@ -121,23 +119,6 @@ class RILEnv:
                 data["color"] = img
             return data
 
-        # Multi-cam visual transformation
-        rw, rh, col, row = optimal_row_cols(
-            n_cameras=len(camera_serial_numbers),
-            in_wh_ratio=obs_image_resolution[0] / obs_image_resolution[1],
-            max_resolution=multi_cam_vis_resolution,
-        )
-        vis_color_transform = get_image_transform(
-            input_res=video_capture_resolution,
-            output_res=(rw, rh),
-            bgr_to_rgb=False,
-        )
-
-        def vis_transform(data):
-            if "color" in data:
-                data["color"] = vis_color_transform(data["color"])
-            return data
-
         recording_transform = transform
         recording_fps = video_capture_fps
         recording_pix_fmt = "rgb24"
@@ -165,22 +146,10 @@ class RILEnv:
             enable_infrared=False,
             get_max_k=max_obs_buffer_size,
             transform=transform,
-            vis_transform=vis_transform,
             recording_transform=recording_transform,
             video_recorder=video_recorder,
             verbose=False,
         )
-
-        multi_cam_vis = None
-        if enable_multi_cam_vis:
-            print("MULTICAMVIS ENABLE")
-            multi_cam_vis = MultiCameraVisualizer(
-                realsense=realsense,
-                row=row,
-                col=col,
-                window_name="Multi Cam Vis",
-                rgb_to_bgr=False,
-            )
 
         robot = XArmController(
             shm_manager=shm_manager,
@@ -190,7 +159,6 @@ class RILEnv:
         self.realsense = realsense
         self.robot = robot
         self.xarm_config = xarm_config
-        self.multi_cam_vis = multi_cam_vis
         self.video_capture_fps = video_capture_fps
         self.frequency = frequency
         self.num_obs_steps = num_obs_steps
@@ -221,9 +189,6 @@ class RILEnv:
         else:
             self.realsense.start(wait=False)
             self.robot.start(wait=False)
-        if self.multi_cam_vis is not None:
-            print("MULTICAMVIS START")
-            self.multi_cam_vis.start(wait=True)
 
     def stop(self, wait=True):
         self.end_episode()
@@ -233,9 +198,6 @@ class RILEnv:
         else:
             self.realsense.stop(wait=False)
             self.robot.stop(wait=False)
-        if self.multi_cam_vis is not None:
-            print("MULTICAMVIS STOP")
-            self.multi_cam_vis.stop(wait=True)
 
     def __enter__(self):
         self.start()
