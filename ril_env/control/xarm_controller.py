@@ -237,6 +237,14 @@ class XArm:
         if code != 0:
             logger.error(f"Error in set_gripper_position: {code}")
             raise RuntimeError(f"Error in set_gripper_position: {code}")
+        
+    def move_joints(self, joints):
+        code = self.arm.set_servo_angle(
+            angle=joints, speed=self.config.home_speed, wait=True
+        )
+        if code != 0:
+            logger.error(f"Error in set_servo_angle (moving joints): {code}")
+            raise RuntimeError(f"Error in set_servo_angle (moving joints): {code}")
 
     def __enter__(self):
         self.initialize()
@@ -269,6 +277,7 @@ class XArmController(mp.Process):
         self.home_speed = xarm_config.home_speed
         self.tcp_maxacc = xarm_config.tcp_maxacc
         self.verbose = xarm_config.verbose
+        self.arm = None
 
         if self.verbose:
             logger.setLevel(logging.DEBUG)
@@ -425,6 +434,9 @@ class XArmController(mp.Process):
             arm.clean_error()
             arm.clean_warn()
             arm.set_tcp_maxacc(self.tcp_maxacc)
+            print("Setting arm")
+            self.arm = arm
+            print("Arm set")
 
             code = arm.motion_enable(True)
             if code != 0:
@@ -473,12 +485,33 @@ class XArmController(mp.Process):
                         grasp = command["grasp"]
                         self.last_target_pose = target_pose
                         logger.debug(f"[XArmController] New target pose: {target_pose}")
+                        
+                        # Check for special clean_errors flag
+                        if command.get("clean_errors", False):
+                            logger.info("[XArmController] Cleaning errors and resetting state...")
+                            arm.clean_error()
+                            arm.clean_warn()
+                            arm.motion_enable(True)
+                            arm.set_mode(0)  # Set to position control mode first
+                            arm.set_state(0)  # Set to ready state
+                            time.sleep(0.1)
+                            arm.set_mode(1)  # Set back to servo mode
+                            arm.set_state(0)  # Set to ready state
+                            time.sleep(0.1)
                     elif cmd == Command.HOME.value:
                         # Currently, there are some issues here. It is best to move closer
                         # to home before homing, otherwise it is *very* dangerous.
                         logger.info("[XArmController] Received HOME command.")
-                        arm.set_mode(0)
-                        arm.set_state(0)
+                        # First clean errors and ensure correct mode
+                        arm.clean_error()
+                        arm.clean_warn()
+                        arm.motion_enable(True)
+                        
+                        # Proper mode switching for homing
+                        arm.set_mode(0)  # Position control mode
+                        arm.set_state(0)  # Ready state
+                        time.sleep(0.2)  # Give time for mode change to take effect
+                        
                         code = arm.set_gripper_position(850, wait=False)
                         if code != 0:
                             logger.error(
@@ -487,8 +520,12 @@ class XArmController(mp.Process):
                         code = arm.set_servo_angle(
                             angle=self.home_pos, speed=self.home_speed, wait=True
                         )
-                        arm.set_mode(1)
-                        arm.set_state(0)
+                        
+                        # Reset back to servo mode after homing
+                        time.sleep(0.2)
+                        arm.set_mode(1)  # Servo mode
+                        arm.set_state(0)  # Ready state
+                        
                         code, pos = arm.get_position(is_radian=False)
                         if code == 0:
                             self.last_target_pose = np.array(pos[:6], dtype=np.float64)
